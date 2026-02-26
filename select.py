@@ -10,17 +10,39 @@ from .aes_util import encrypt_data
 DOMAIN = "hanchuess"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    async_add_entities([DeviceControlSelect(entry)])
+    coordinator = hass.data[DOMAIN].get(entry.entry_id)
+    async_add_entities([DeviceControlSelect(entry, coordinator)])
 
 class DeviceControlSelect(SelectEntity):
     _attr_name = "工作模式"
     _attr_icon = "mdi:tune"
     _attr_options = ["自发自用模式", "后备能源模式", "分时充放", "基于SOC", "馈网优先模式", "离网模式"]
     
-    def __init__(self, entry):
+    def __init__(self, entry, coordinator=None):
         self.entry = entry
+        self.coordinator = coordinator
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
         self._attr_current_option = None
+    
+    @property
+    def current_option(self):
+        """返回当前选中的选项"""
+        # 如果有coordinator且有数据，从数据中读取
+        if self.coordinator and self.coordinator.data:
+            value_to_name = {
+                "1": "自发自用模式",
+                "2": "后备能源模式",
+                "3": "分时充放",
+                "9": "基于SOC",
+                "10": "馈网优先模式",
+                "4": "离网模式"
+            }
+            work_mode = self.coordinator.data.get("workModeCmb")
+            if work_mode:
+                return value_to_name.get(str(work_mode))
+        
+        # 否则返回手动设置的值
+        return self._attr_current_option
     
     @property
     def device_info(self):
