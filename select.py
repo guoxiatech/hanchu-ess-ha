@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .aes_util import encrypt_data
 import logging
 
@@ -15,13 +16,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     coordinator = hass.data[DOMAIN].get(entry.entry_id)
     async_add_entities([DeviceControlSelect(coordinator, entry)])
 
-class DeviceControlSelect(SelectEntity):
+class DeviceControlSelect(CoordinatorEntity, SelectEntity):
     _attr_name = "工作模式"
     _attr_icon = "mdi:tune"
     _attr_options = ["自发自用模式", "后备能源模式", "分时充放", "基于SOC", "馈网优先模式", "离网模式"]
     
     def __init__(self, coordinator, entry):
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.entry = entry
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
     
@@ -34,10 +35,8 @@ class DeviceControlSelect(SelectEntity):
             model="ESS Device",
         )
     
-    async def async_update(self):
-        await self.coordinator.async_request_refresh()
-        _LOGGER.info(f"[SELECT_FINAL] workModeCmb={self.coordinator.data.get('workModeCmb')}")
-        
+    @property
+    def current_option(self):
         value_to_name = {
             1: "自发自用模式",
             2: "后备能源模式",
@@ -47,9 +46,7 @@ class DeviceControlSelect(SelectEntity):
             4: "离网模式"
         }
         work_mode = self.coordinator.data.get("workModeCmb")
-        if work_mode is not None:
-            self._attr_current_option = value_to_name.get(work_mode)
-            _LOGGER.info(f"[SELECT_FINAL] Set to: {self._attr_current_option}")
+        return value_to_name.get(work_mode)
     
     async def async_select_option(self, option: str):
         mode_map = {
