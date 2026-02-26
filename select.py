@@ -35,8 +35,8 @@ class DeviceControlSelect(SelectEntity):
         )
     
     async def async_update(self):
-        _LOGGER.info(f"[SELECT_NEW] async_update called")
-        _LOGGER.info(f"[SELECT_NEW] coordinator.data: {self.coordinator.data}")
+        await self.coordinator.async_request_refresh()
+        _LOGGER.info(f"[SELECT_FINAL] workModeCmb={self.coordinator.data.get('workModeCmb')}")
         
         value_to_name = {
             1: "自发自用模式",
@@ -47,14 +47,9 @@ class DeviceControlSelect(SelectEntity):
             4: "离网模式"
         }
         work_mode = self.coordinator.data.get("workModeCmb")
-        _LOGGER.info(f"[SELECT_NEW] workModeCmb: {work_mode}, type: {type(work_mode)}")
-        
         if work_mode is not None:
-            self._attr_current_option = value_to_name.get(work_mode, "未知")
-        else:
-            self._attr_current_option = None
-        
-        _LOGGER.info(f"[SELECT_NEW] _attr_current_option: {self._attr_current_option}")
+            self._attr_current_option = value_to_name.get(work_mode)
+            _LOGGER.info(f"[SELECT_FINAL] Set to: {self._attr_current_option}")
     
     async def async_select_option(self, option: str):
         mode_map = {
