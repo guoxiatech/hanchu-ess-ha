@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from .aes_util import encrypt_data
 
 SCAN_INTERVAL = timedelta(seconds=30)
 DOMAIN = "hanchuess"
@@ -44,11 +45,14 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
         url = f"{domain}/gateway/app/ha/getDeviceStatus"
         try:
             async with async_timeout.timeout(10):
+                # 加密请求数据
+                encrypted_data = encrypt_data({
+                    "language": language,
+                    "deviceId": device_id
+                })
+                
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json={
-                        "language": language,
-                        "deviceId": device_id
-                    }) as response:
+                    async with session.post(url, json={"data": encrypted_data}) as response:
                         if response.status == 200:
                             result = await response.json()
                             if result.get("success"):

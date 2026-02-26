@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity import DeviceInfo
+from .aes_util import encrypt_data
 
 DOMAIN = "hanchuess"
 
@@ -49,11 +50,14 @@ class DeviceControlSelect(SelectEntity):
             url = f"{domain}/gateway/app/ha/deviceControl"
             
             try:
+                # 加密请求数据
+                encrypted_data = encrypt_data({
+                    "deviceId": device_id,
+                    "valueMap": {"WORK_MODE_CMB": value}
+                })
+                
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json={
-                        "deviceId": device_id,
-                        "valueMap": {"WORK_MODE_CMB": value}
-                    }) as response:
+                    async with session.post(url, json={"data": encrypted_data}) as response:
                         if response.status == 200:
                             result = await response.json()
                             if result.get("success"):
