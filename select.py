@@ -17,15 +17,30 @@ class DeviceControlSelect(SelectEntity):
     _attr_name = "工作模式"
     _attr_icon = "mdi:tune"
     _attr_options = ["自发自用模式", "后备能源模式", "分时充放", "基于SOC", "馈网优先模式", "离网模式"]
+    _attr_should_poll = False
     
     def __init__(self, coordinator, entry):
         self.coordinator = coordinator
         self.entry = entry
         self._attr_unique_id = f"{entry.entry_id}_control"
     
+    async def async_added_to_hass(self):
+        """实体添加到HA时注册coordinator监听"""
+        self.async_on_remove(
+            self.coordinator.async_add_listener(self.async_write_ha_state)
+        )
+    
+    @property
+    def available(self):
+        """实体是否可用"""
+        return self.coordinator.last_update_success
+    
     @property
     def current_option(self):
         """返回当前选中的选项"""
+        if not self.coordinator.data:
+            return None
+        
         value_to_name = {
             "1": "自发自用模式",
             "2": "后备能源模式",
