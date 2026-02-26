@@ -10,16 +10,14 @@ from .aes_util import encrypt_data
 DOMAIN = "hanchuess"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([DeviceControlSelect(coordinator, entry)])
+    async_add_entities([DeviceControlSelect(entry)])
 
 class DeviceControlSelect(SelectEntity):
     _attr_name = "工作模式"
     _attr_icon = "mdi:tune"
     _attr_options = ["自发自用模式", "后备能源模式", "分时充放", "基于SOC", "馈网优先模式", "离网模式"]
     
-    def __init__(self, coordinator, entry):
-        self.coordinator = coordinator
+    def __init__(self, entry):
         self.entry = entry
         self._attr_unique_id = f"{entry.entry_id}_control"
         self._attr_current_option = None
