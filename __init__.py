@@ -11,7 +11,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # 先加载sensor创建coordinator
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    # 再加载select使用coordinator
+    await hass.config_entries.async_forward_entry_setups(entry, ["select"])
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -13,8 +13,11 @@ DOMAIN = "hanchuess"
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+    _LOGGER.error(f"[SELECT_SETUP] Starting, hass.data[DOMAIN]={hass.data.get(DOMAIN)}")
     coordinator = hass.data[DOMAIN].get(entry.entry_id)
-    _LOGGER.error(f"[SELECT_SETUP] coordinator={coordinator}")
+    _LOGGER.error(f"[SELECT_SETUP] coordinator={coordinator}, entry_id={entry.entry_id}")
+    if coordinator:
+        _LOGGER.error(f"[SELECT_SETUP] coordinator.data={coordinator.data}")
     async_add_entities([DeviceControlSelect(coordinator, entry)])
 
 class DeviceControlSelect(CoordinatorEntity, SelectEntity):
