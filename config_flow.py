@@ -34,7 +34,11 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 })
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json={"data": encrypted_data}) as response:
+                    async with session.post(
+                        url, 
+                        data=encrypted_data,
+                        headers={"Content-Type": "text/plain"}
+                    ) as response:
                         _LOGGER.info(f"Auth response status: {response.status}")
                         if response.status == 200:
                             result = await response.json()

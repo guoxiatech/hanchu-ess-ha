@@ -52,7 +52,11 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
                 })
                 
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json={"data": encrypted_data}) as response:
+                    async with session.post(
+                        url, 
+                        data=encrypted_data,
+                        headers={"Content-Type": "text/plain"}
+                    ) as response:
                         if response.status == 200:
                             result = await response.json()
                             if result.get("success"):
