@@ -13,11 +13,7 @@ DOMAIN = "hanchuess"
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    _LOGGER.error(f"[SELECT_SETUP] Starting, hass.data[DOMAIN]={hass.data.get(DOMAIN)}")
     coordinator = hass.data[DOMAIN].get(entry.entry_id)
-    _LOGGER.error(f"[SELECT_SETUP] coordinator={coordinator}, entry_id={entry.entry_id}")
-    if coordinator:
-        _LOGGER.error(f"[SELECT_SETUP] coordinator.data={coordinator.data}")
     async_add_entities([DeviceControlSelect(coordinator, entry)])
 
 class DeviceControlSelect(CoordinatorEntity, SelectEntity):
@@ -29,7 +25,6 @@ class DeviceControlSelect(CoordinatorEntity, SelectEntity):
         super().__init__(coordinator)
         self.entry = entry
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
-        _LOGGER.error(f"[SELECT_INIT] Initialized")
     
     @property
     def device_info(self):
@@ -41,14 +36,7 @@ class DeviceControlSelect(CoordinatorEntity, SelectEntity):
         )
     
     @property
-    def available(self):
-        result = super().available
-        _LOGGER.error(f"[SELECT_AVAILABLE] available={result}")
-        return result
-    
-    @property
     def current_option(self):
-        _LOGGER.error(f"[SELECT_CURRENT] Called, data={self.coordinator.data}")
         value_to_name = {
             1: "自发自用模式",
             2: "后备能源模式",
@@ -58,12 +46,9 @@ class DeviceControlSelect(CoordinatorEntity, SelectEntity):
             4: "离网模式"
         }
         work_mode = self.coordinator.data.get("workModeCmb")
-        result = value_to_name.get(work_mode)
-        _LOGGER.error(f"[SELECT_CURRENT] workModeCmb={work_mode}, result={result}")
-        return result
+        return value_to_name.get(work_mode)
     
     async def async_select_option(self, option: str):
-        _LOGGER.error(f"[SELECT_OPTION] Selecting: {option}")
         mode_map = {
             "自发自用模式": "1",
             "后备能源模式": "2",
@@ -96,6 +81,5 @@ class DeviceControlSelect(CoordinatorEntity, SelectEntity):
                             result = await response.json()
                             if result.get("success"):
                                 await self.coordinator.async_request_refresh()
-                                _LOGGER.error(f"[SELECT_OPTION] Success")
             except Exception as e:
-                _LOGGER.error(f"[SELECT_OPTION] Error: {e}")
+                _LOGGER.error(f"[Select] Error: {e}")
