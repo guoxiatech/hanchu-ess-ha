@@ -50,9 +50,9 @@ class DeviceControlSelect(SelectEntity):
             _LOGGER.warning(f"[Select] No coordinator or data")
             return None
         
-        _LOGGER.info(f"[Select] Full coordinator data: {self.coordinator.data}")
+        _LOGGER.info(f"[SELECT_DEBUG_2026] Full data: {self.coordinator.data}")
         work_mode = self.coordinator.data.get("workModeCmb")
-        _LOGGER.info(f"[Select] workModeCmb value: {work_mode}, type: {type(work_mode)}")
+        _LOGGER.info(f"[SELECT_DEBUG_2026] workModeCmb={work_mode}, type={type(work_mode)}")
         
         if work_mode is None:
             return None
@@ -73,7 +73,7 @@ class DeviceControlSelect(SelectEntity):
             "4": "离网模式"
         }
         result = value_to_name.get(work_mode)
-        _LOGGER.info(f"[Select] Mapped result: {result}")
+        _LOGGER.info(f"[SELECT_DEBUG_2026] Result={result}")
         return result
     
     @property
