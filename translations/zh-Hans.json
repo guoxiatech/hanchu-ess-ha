@@ -1,0 +1,10 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "设置Hanchuess",
+        "description": "配置您的Hanchuess设备"
+      }
+    }
+  }
+}

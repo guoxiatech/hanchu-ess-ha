@@ -1,0 +1,10 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Setup Hanchuess",
+        "description": "Configure your Hanchuess device"
+      }
+    }
+  }
+}

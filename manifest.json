@@ -1,0 +1,10 @@
+{
+  "domain": "hanchuess",
+  "name": "Hanchuess",
+  "documentation": "https://github.com/yourusername/hanchuess-ha",
+  "requirements": [],
+  "codeowners": [],
+  "version": "1.0.0",
+  "iot_class": "cloud_polling",
+  "config_flow": true
+}
