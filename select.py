@@ -27,8 +27,12 @@ class DeviceControlSelect(SelectEntity):
     @property
     def current_option(self):
         """返回当前选中的选项"""
+        import logging
+        _LOGGER = logging.getLogger(__name__)
+        
         # 如果有coordinator且有数据，从数据中读取
         if self.coordinator and self.coordinator.data:
+            _LOGGER.info(f"[Select] Coordinator data: {self.coordinator.data}")
             value_to_name = {
                 "1": "自发自用模式",
                 "2": "后备能源模式",
@@ -38,8 +42,13 @@ class DeviceControlSelect(SelectEntity):
                 "4": "离网模式"
             }
             work_mode = self.coordinator.data.get("workModeCmb")
+            _LOGGER.info(f"[Select] workModeCmb value: {work_mode}")
             if work_mode:
-                return value_to_name.get(str(work_mode))
+                result = value_to_name.get(str(work_mode))
+                _LOGGER.info(f"[Select] Mapped to: {result}")
+                return result
+        else:
+            _LOGGER.info(f"[Select] No coordinator or data")
         
         # 否则返回手动设置的值
         return self._attr_current_option
