@@ -34,6 +34,9 @@ class DeviceControlSelect(SelectEntity):
         )
     
     async def async_select_option(self, option: str):
+        import logging
+        _LOGGER = logging.getLogger(__name__)
+        
         mode_map = {
             "自发自用模式": "1",
             "后备能源模式": "2",
@@ -48,13 +51,17 @@ class DeviceControlSelect(SelectEntity):
             domain = self.entry.data["domain"]
             device_id = self.entry.data["device_id"]
             url = f"{domain}/gateway/app/ha/deviceControl"
+            _LOGGER.info(f"[Select] Requesting {url}")
             
             try:
                 # 加密请求数据
-                encrypted_data = encrypt_data({
+                request_data = {
                     "deviceId": device_id,
                     "valueMap": {"WORK_MODE_CMB": value}
-                })
+                }
+                _LOGGER.info(f"[Select] Request data before encrypt: {request_data}")
+                encrypted_data = encrypt_data(request_data)
+                _LOGGER.info(f"[Select] Encrypted data: {encrypted_data}")
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
@@ -62,10 +69,14 @@ class DeviceControlSelect(SelectEntity):
                         data=encrypted_data,
                         headers={"Content-Type": "text/plain"}
                     ) as response:
+                        _LOGGER.info(f"[Select] Response status: {response.status}")
+                        response_text = await response.text()
+                        _LOGGER.info(f"[Select] Response text: {response_text}")
                         if response.status == 200:
                             result = await response.json()
+                            _LOGGER.info(f"[Select] Response json: {result}")
                             if result.get("success"):
                                 self._attr_current_option = option
                                 self.async_write_ha_state()
-            except:
-                pass
+            except Exception as e:
+                _LOGGER.error(f"[Select] Error: {e}")

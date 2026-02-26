@@ -38,18 +38,26 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
         self.entry = entry
         
     async def _async_update_data(self):
+        import logging
+        _LOGGER = logging.getLogger(__name__)
+        
         domain = self.entry.data["domain"]
         device_id = self.entry.data["device_id"]
         language = self.hass.config.language or "en"
         
         url = f"{domain}/gateway/app/ha/getDeviceStatus"
+        _LOGGER.info(f"[Sensor] Requesting {url}")
+        
         try:
             async with async_timeout.timeout(10):
                 # 加密请求数据
-                encrypted_data = encrypt_data({
+                request_data = {
                     "language": language,
                     "deviceId": device_id
-                })
+                }
+                _LOGGER.info(f"[Sensor] Request data before encrypt: {request_data}")
+                encrypted_data = encrypt_data(request_data)
+                _LOGGER.info(f"[Sensor] Encrypted data: {encrypted_data}")
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
@@ -57,14 +65,18 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
                         data=encrypted_data,
                         headers={"Content-Type": "text/plain"}
                     ) as response:
+                        _LOGGER.info(f"[Sensor] Response status: {response.status}")
+                        response_text = await response.text()
+                        _LOGGER.info(f"[Sensor] Response text: {response_text}")
                         if response.status == 200:
                             result = await response.json()
+                            _LOGGER.info(f"[Sensor] Response json: {result}")
                             if result.get("success"):
                                 data = result.get("data", {})
                                 data["_status"] = "在线"
                                 return data
-        except:
-            pass
+        except Exception as e:
+            _LOGGER.error(f"[Sensor] Error: {e}")
         return {"_status": "离线"}
 
 class DeviceStatusSensor(SensorEntity):

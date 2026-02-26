@@ -26,12 +26,15 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             try:
                 # 加密请求数据
-                encrypted_data = encrypt_data({
+                request_data = {
                     "language": language,
                     "domain": domain,
                     "deviceId": device_id,
                     "secretKey": secret_key
-                })
+                }
+                _LOGGER.info(f"Auth request data before encrypt: {request_data}")
+                encrypted_data = encrypt_data(request_data)
+                _LOGGER.info(f"Auth encrypted data: {encrypted_data}")
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
@@ -40,9 +43,11 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         headers={"Content-Type": "text/plain"}
                     ) as response:
                         _LOGGER.info(f"Auth response status: {response.status}")
+                        response_text = await response.text()
+                        _LOGGER.info(f"Auth response text: {response_text}")
                         if response.status == 200:
                             result = await response.json()
-                            _LOGGER.info(f"Auth response: {result}")
+                            _LOGGER.info(f"Auth response json: {result}")
                             if result.get("success"):
                                 return self.async_create_entry(
                                     title=f"Hanchuess {device_id}",
