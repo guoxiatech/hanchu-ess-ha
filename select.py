@@ -6,8 +6,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity import DeviceInfo
 from .aes_util import encrypt_data
+import logging
 
 DOMAIN = "hanchuess"
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     coordinator = hass.data[DOMAIN].get(entry.entry_id)
@@ -17,6 +19,7 @@ class DeviceControlSelect(SelectEntity):
     _attr_name = "工作模式"
     _attr_icon = "mdi:tune"
     _attr_options = ["自发自用模式", "后备能源模式", "分时充放", "基于SOC", "馈网优先模式", "离网模式"]
+    _attr_should_poll = False
     
     def __init__(self, entry, coordinator=None):
         self.entry = entry
@@ -24,15 +27,21 @@ class DeviceControlSelect(SelectEntity):
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
         self._attr_current_option = None
     
+    async def async_added_to_hass(self):
+        """实体添加到HA时注册coordinator监听"""
+        if self.coordinator:
+            self.async_on_remove(
+                self.coordinator.async_add_listener(self._handle_coordinator_update)
+            )
+    
+    def _handle_coordinator_update(self):
+        """处理coordinator数据更新"""
+        self.async_write_ha_state()
+    
     @property
     def current_option(self):
         """返回当前选中的选项"""
-        import logging
-        _LOGGER = logging.getLogger(__name__)
-        
-        # 如果有coordinator且有数据，从数据中读取
         if self.coordinator and self.coordinator.data:
-            _LOGGER.info(f"[Select] Coordinator data: {self.coordinator.data}")
             value_to_name = {
                 "1": "自发自用模式",
                 "2": "后备能源模式",
@@ -42,15 +51,9 @@ class DeviceControlSelect(SelectEntity):
                 "4": "离网模式"
             }
             work_mode = self.coordinator.data.get("workModeCmb")
-            _LOGGER.info(f"[Select] workModeCmb value: {work_mode}")
-            if work_mode:
-                result = value_to_name.get(str(work_mode))
-                _LOGGER.info(f"[Select] Mapped to: {result}")
-                return result
-        else:
-            _LOGGER.info(f"[Select] No coordinator or data")
+            if work_mode is not None:
+                return value_to_name.get(str(work_mode))
         
-        # 否则返回手动设置的值
         return self._attr_current_option
     
     @property
@@ -63,9 +66,6 @@ class DeviceControlSelect(SelectEntity):
         )
     
     async def async_select_option(self, option: str):
-        import logging
-        _LOGGER = logging.getLogger(__name__)
-        
         mode_map = {
             "自发自用模式": "1",
             "后备能源模式": "2",
@@ -80,14 +80,12 @@ class DeviceControlSelect(SelectEntity):
             domain = self.entry.data["domain"]
             device_id = self.entry.data["device_id"]
             url = f"{domain}/gateway/app/ha/deviceControl"
-            _LOGGER.info(f"[Select] Requesting {url}")
             
             try:
                 request_data = {
                     "deviceId": device_id,
                     "valueMap": {"WORK_MODE_CMB": value}
                 }
-                _LOGGER.info(f"[Select] Request data: {request_data}")
                 encrypted_data = encrypt_data(request_data)
                 
                 async with aiohttp.ClientSession() as session:
@@ -99,7 +97,10 @@ class DeviceControlSelect(SelectEntity):
                         if response.status == 200:
                             result = await response.json()
                             if result.get("success"):
-                                self._attr_current_option = option
-                                self.async_write_ha_state()
+                                if self.coordinator:
+                                    await self.coordinator.async_request_refresh()
+                                else:
+                                    self._attr_current_option = option
+                                    self.async_write_ha_state()
             except Exception as e:
                 _LOGGER.error(f"[Select] Error: {e}")
