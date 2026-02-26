@@ -1,6 +1,7 @@
 """设备状态传感器"""
 import aiohttp
 import async_timeout
+import logging
 from datetime import timedelta
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity import EntityCategory
@@ -34,11 +35,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class DeviceDataCoordinator(DataUpdateCoordinator):
     """数据协调器"""
     def __init__(self, hass, entry):
-        super().__init__(hass, None, "hanchuess", update_interval=SCAN_INTERVAL)
+        super().__init__(
+            hass,
+            logging.getLogger(__name__),
+            name="hanchuess",
+            update_interval=SCAN_INTERVAL
+        )
         self.entry = entry
         
     async def _async_update_data(self):
-        import logging
         _LOGGER = logging.getLogger(__name__)
         
         domain = self.entry.data["domain"]
