@@ -70,7 +70,15 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
                             _LOGGER.info(f"[Sensor] Response json: {result}")
                             if result.get("success"):
                                 data = result.get("data", {})
-                                data["_status"] = "在线"
+                                dev_status = data.get("devStatus")
+                                if dev_status == 1:
+                                    data["_status"] = "在线"
+                                elif dev_status == 0:
+                                    data["_status"] = "离线"
+                                elif dev_status == 99:
+                                    data["_status"] = "待接入"
+                                else:
+                                    data["_status"] = "未知"
                                 return data
         except Exception as e:
             _LOGGER.error(f"[Sensor] Error: {e}")
