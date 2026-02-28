@@ -71,6 +71,11 @@ class DeviceDataCoordinator(DataUpdateCoordinator):
                             if result.get("success"):
                                 data = result.get("data", {})
                                 dev_status = data.get("devStatus")
+                                try:
+                                    dev_status = int(dev_status)
+                                except (ValueError, TypeError):
+                                    dev_status = None
+                                
                                 if dev_status == 1:
                                     data["_status"] = "在线"
                                 elif dev_status == 0:
