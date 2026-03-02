@@ -105,6 +105,23 @@ class DeviceStatusSensor(SensorEntity):
             manufacturer="Hanchuess",
             model="ESS Device",
         )
+    
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data
+        soc = data.get("batSoc")
+        if soc is not None:
+            soc = f"{int(soc * 100)}%"
+        
+        return {
+            "电池电量": soc,
+            "电池功率": f"{data.get('batP', 0)} {data.get('batPUnit', 'W')}",
+            "负载功率": f"{data.get('loadPwr', 0)} W",
+            "光伏功率": f"{data.get('pvTtPwr', 0)} {data.get('pvTtPwrUnit', 'W')}",
+            "电网功率": f"{data.get('meterPPwr', 0)} {data.get('meterPPwrUnit', 'W')}",
+            "工作模式": data.get("deviceStatusDes", "-"),
+            "设备序列号": data.get("sn", "-"),
+        }
 
     async def async_update(self):
         await self.coordinator.async_request_refresh()
