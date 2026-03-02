@@ -1,12 +1,21 @@
 """Hanchuess Home Assistant集成"""
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+import os
 
 DOMAIN = "hanchuess"
 PLATFORMS = ["sensor", "select"]
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    
+    # 注册前端资源
+    hass.http.register_static_path(
+        "/hacsfiles/hanchuess",
+        hass.config.path(f"custom_components/{DOMAIN}/www"),
+        True
+    )
+    
     return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

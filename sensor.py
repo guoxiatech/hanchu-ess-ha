@@ -127,4 +127,3 @@ class DeviceStatusSensor(SensorEntity):
         await self.coordinator.async_request_refresh()
         self._attr_native_value = self.coordinator.data.get("_status", "未知")
 
-
