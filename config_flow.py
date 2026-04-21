@@ -86,7 +86,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     pending.append({"sn": p_sn, "devType": p_type})
 
                 return self.async_create_entry(
-                    title=f"Hanchuess {sn}" if len(selected) == 1 else f"Hanchuess ({len(selected)} devices)",
+                    title=f"Hanchuess {sn}",
                     data={
                         "device_id": sn,
                         "dev_type": dev_type,
