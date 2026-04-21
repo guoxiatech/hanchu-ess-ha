@@ -1,29 +1,29 @@
 // ===== Card Editor =====
 class HanchuessEnergyCardEditor extends HTMLElement {
-  set hass(hass) {
-    this._hass = hass;
-    if (!this._rendered) this._render();
+  setConfig(config) {
+    this._config = Object.assign({ entity: "", device_id: "" }, config || {});
+    this._render();
   }
 
-  setConfig(config) {
-    this._config = config;
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
   }
 
   _render() {
-    this._rendered = true;
-    this.innerHTML = "";
+    if (!this._hass || !this._config) return;
 
     const entities = Object.keys(this._hass.states)
       .filter(eid => eid.startsWith("select.") && eid.includes("work_mode"));
 
     this.innerHTML = `
-      <div style="padding: 8px;">
-        <p><b>设备</b></p>
-        <select id="entity_select" style="width:100%;padding:8px;margin-bottom:12px;">
+      <div style="padding: 16px;">
+        <label style="font-weight:500;display:block;margin-bottom:8px;">设备</label>
+        <select id="entity_select" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
           <option value="">请选择设备</option>
           ${entities.map(eid => {
             const state = this._hass.states[eid];
-            const name = state.attributes.friendly_name || eid;
+            const name = (state.attributes.friendly_name || eid).replace(" 工作模式", "");
             const selected = this._config.entity === eid ? "selected" : "";
             return `<option value="${eid}" ${selected}>${name}</option>`;
           }).join("")}
@@ -36,8 +36,9 @@ class HanchuessEnergyCardEditor extends HTMLElement {
       const state = this._hass.states[entityId];
       const deviceId = state && state.attributes ? (state.attributes.device_id || "") : "";
 
+      this._config = { ...this._config, entity: entityId, device_id: deviceId };
       this.dispatchEvent(new CustomEvent("config-changed", {
-        detail: { config: { ...this._config, entity: entityId, device_id: deviceId } },
+        detail: { config: this._config },
         bubbles: true,
         composed: true,
       }));
@@ -50,25 +51,28 @@ customElements.define("hanchuess-energy-card-editor", HanchuessEnergyCardEditor)
 class HanchuessEnergyCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
-    if (!this._initialized) {
+    if (!this._rendered && this._config && this._config.entity) {
       this._render();
-      this._initialized = true;
+      this._rendered = true;
     }
-    this._updateValues();
+    if (this._rendered) this._updateValues();
   }
 
   setConfig(config) {
-    if (!config.entity) throw new Error("Please define an entity");
-    this._config = config;
-    this._initialized = false;
+    this._config = Object.assign({ entity: "", device_id: "" }, config || {});
+    this._rendered = false;
   }
 
   static getConfigElement() {
     return document.createElement("hanchuess-energy-card-editor");
   }
 
-  static getStubConfig() {
-    return { entity: "", device_id: "" };
+  static getStubConfig(hass) {
+    const entity = Object.keys(hass.states)
+      .find(eid => eid.startsWith("select.") && eid.includes("work_mode")) || "";
+    const state = hass.states[entity];
+    const deviceId = state && state.attributes ? (state.attributes.device_id || "") : "";
+    return { entity, device_id: deviceId };
   }
 
   _render() {
@@ -101,6 +105,7 @@ class HanchuessEnergyCard extends HTMLElement {
         .status { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; text-align: center; }
         .status.error { color: var(--error-color); }
         .status.success { color: var(--success-color, #4caf50); }
+        .no-entity { padding: 16px; color: var(--secondary-text-color); text-align: center; }
       </style>
       <ha-card>
         <div class="title">储能设置</div>
@@ -155,12 +160,14 @@ class HanchuessEnergyCard extends HTMLElement {
   }
 
   _updateValues() {
-    if (!this._hass || !this._config) return;
+    if (!this._hass || !this._config || !this._config.entity) return;
 
     const state = this._hass.states[this._config.entity];
     if (!state) return;
 
     const select = this.shadowRoot.getElementById("work_mode");
+    if (!select) return;
+
     const options = state.attributes.options || [];
     const current = state.state;
 
@@ -177,6 +184,7 @@ class HanchuessEnergyCard extends HTMLElement {
 
   _toggleTouFields(mode) {
     const touFields = this.shadowRoot.getElementById("tou_fields");
+    if (!touFields) return;
     const isTou = mode === "分时充放" || mode === "Time of Use" || mode === "TOU";
     touFields.classList.toggle("visible", isTou);
   }
@@ -197,13 +205,11 @@ class HanchuessEnergyCard extends HTMLElement {
     const workMode = this.shadowRoot.getElementById("work_mode").value;
 
     try {
-      // Set work mode
       await this._hass.callService("select", "select_option", {
         entity_id: entityId,
         option: workMode,
       });
 
-      // If TOU mode, submit time and power fields
       const isTou = workMode === "分时充放" || workMode === "Time of Use" || workMode === "TOU";
       if (isTou) {
         await this._hass.callService("hanchuess", "device_control", {
