@@ -4,7 +4,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfEnergy
+from homeassistant.const import PERCENTAGE, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -16,7 +16,6 @@ SENSORS = {
     "device_status": {
         "key": "devStatus",
         "icon": "mdi:check-circle",
-        "coordinator": "realtime",
     },
     "battery_soc": {
         "key": "batSoc",
@@ -25,7 +24,6 @@ SENSORS = {
         "unit": PERCENTAGE,
         "icon": "mdi:battery",
         "scale": 100,
-        "coordinator": "realtime",
     },
     "battery_power": {
         "key": "batP",
@@ -33,7 +31,6 @@ SENSORS = {
         "state_class": SensorStateClass.MEASUREMENT,
         "unit": UnitOfPower.WATT,
         "icon": "mdi:battery-charging",
-        "coordinator": "realtime",
     },
     "pv_power": {
         "key": "pvTtPwr",
@@ -41,7 +38,6 @@ SENSORS = {
         "state_class": SensorStateClass.MEASUREMENT,
         "unit": UnitOfPower.WATT,
         "icon": "mdi:solar-power",
-        "coordinator": "realtime",
     },
     "grid_power": {
         "key": "meterPPwr",
@@ -49,7 +45,6 @@ SENSORS = {
         "state_class": SensorStateClass.MEASUREMENT,
         "unit": UnitOfPower.WATT,
         "icon": "mdi:transmission-tower",
-        "coordinator": "realtime",
     },
     "load_power": {
         "key": "loadPwr",
@@ -57,47 +52,6 @@ SENSORS = {
         "state_class": SensorStateClass.MEASUREMENT,
         "unit": UnitOfPower.WATT,
         "icon": "mdi:home-lightning-bolt",
-        "coordinator": "realtime",
-    },
-    "daily_pv_energy": {
-        "key": "dailyPvEnergy",
-        "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
-        "unit": UnitOfEnergy.KILO_WATT_HOUR,
-        "icon": "mdi:solar-power-variant",
-        "coordinator": "statistics",
-    },
-    "daily_charge_energy": {
-        "key": "dailyChargeEnergy",
-        "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
-        "unit": UnitOfEnergy.KILO_WATT_HOUR,
-        "icon": "mdi:battery-plus",
-        "coordinator": "statistics",
-    },
-    "daily_discharge_energy": {
-        "key": "dailyDischargeEnergy",
-        "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
-        "unit": UnitOfEnergy.KILO_WATT_HOUR,
-        "icon": "mdi:battery-minus",
-        "coordinator": "statistics",
-    },
-    "daily_grid_import": {
-        "key": "dailyGridImport",
-        "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
-        "unit": UnitOfEnergy.KILO_WATT_HOUR,
-        "icon": "mdi:transmission-tower-import",
-        "coordinator": "statistics",
-    },
-    "daily_grid_export": {
-        "key": "dailyGridExport",
-        "device_class": SensorDeviceClass.ENERGY,
-        "state_class": SensorStateClass.TOTAL_INCREASING,
-        "unit": UnitOfEnergy.KILO_WATT_HOUR,
-        "icon": "mdi:transmission-tower-export",
-        "coordinator": "statistics",
     },
 }
 
@@ -111,10 +65,9 @@ STATUS_MAP = {
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    coordinators = hass.data[DOMAIN][entry.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]["realtime"]
     entities = []
     for sensor_key, config in SENSORS.items():
-        coordinator = coordinators[config["coordinator"]]
         if config["key"] in coordinator.data:
             entities.append(HanchueSensor(coordinator, entry, sensor_key, config))
     async_add_entities(entities)
