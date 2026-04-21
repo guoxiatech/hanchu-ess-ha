@@ -2,9 +2,54 @@
   "config": {
     "step": {
       "user": {
-        "title": "設置Hanchuess",
-        "description": "配置您的Hanchuess設備"
+        "title": "登入 Hanchuess",
+        "description": "輸入您的 Hanchuess 帳號資訊",
+        "data": {
+          "account": "帳號",
+          "password": "密碼"
+        }
+      },
+      "select_device": {
+        "title": "選擇設備",
+        "description": "選擇要新增的設備",
+        "data": {
+          "device": "設備"
+        }
       }
+    },
+    "error": {
+      "auth_failed": "授權失敗，請檢查帳號資訊",
+      "cannot_connect": "無法連接到伺服器",
+      "no_devices": "該帳號下未找到設備"
+    },
+    "abort": {
+      "already_configured": "該設備已配置"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": { "name": "設備狀態" },
+      "battery_soc": { "name": "電池電量" },
+      "battery_power": { "name": "電池功率" },
+      "pv_power": { "name": "光伏功率" },
+      "grid_power": { "name": "電網功率" },
+      "load_power": { "name": "負載功率" },
+      "daily_pv_energy": { "name": "今日光伏發電" },
+      "daily_charge_energy": { "name": "今日充電量" },
+      "daily_discharge_energy": { "name": "今日放電量" },
+      "daily_grid_import": { "name": "今日電網購電" },
+      "daily_grid_export": { "name": "今日電網售電" }
+    },
+    "select": {
+      "work_mode": { "name": "工作模式" }
+    },
+    "number": {
+      "charge_power_limit": { "name": "最大充電功率" },
+      "discharge_power_limit": { "name": "最大放電功率" },
+      "soc_min": { "name": "SOC下限" }
+    },
+    "switch": {
+      "inverter_switch": { "name": "逆變器開關" }
     }
   }
 }

@@ -2,18 +2,54 @@
   "config": {
     "step": {
       "user": {
-        "title": "设置Hanchuess",
-        "description": "配置您的Hanchuess设备",
+        "title": "登录 Hanchuess",
+        "description": "输入您的 Hanchuess 账号信息",
         "data": {
-          "domain": "域名",
-          "device_id": "设备ID",
-          "secret_key": "秘钥"
+          "account": "账号",
+          "password": "密码"
+        }
+      },
+      "select_device": {
+        "title": "选择设备",
+        "description": "选择要添加的设备",
+        "data": {
+          "device": "设备"
         }
       }
     },
     "error": {
-      "auth_failed": "授权失败，请检查配置信息",
-      "cannot_connect": "无法连接到服务器"
+      "auth_failed": "授权失败，请检查账号信息",
+      "cannot_connect": "无法连接到服务器",
+      "no_devices": "该账号下未找到设备"
+    },
+    "abort": {
+      "already_configured": "该设备已配置"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": { "name": "设备状态" },
+      "battery_soc": { "name": "电池电量" },
+      "battery_power": { "name": "电池功率" },
+      "pv_power": { "name": "光伏功率" },
+      "grid_power": { "name": "电网功率" },
+      "load_power": { "name": "负载功率" },
+      "daily_pv_energy": { "name": "今日光伏发电" },
+      "daily_charge_energy": { "name": "今日充电量" },
+      "daily_discharge_energy": { "name": "今日放电量" },
+      "daily_grid_import": { "name": "今日电网购电" },
+      "daily_grid_export": { "name": "今日电网售电" }
+    },
+    "select": {
+      "work_mode": { "name": "工作模式" }
+    },
+    "number": {
+      "charge_power_limit": { "name": "最大充电功率" },
+      "discharge_power_limit": { "name": "最大放电功率" },
+      "soc_min": { "name": "SOC下限" }
+    },
+    "switch": {
+      "inverter_switch": { "name": "逆变器开关" }
     }
   }
 }

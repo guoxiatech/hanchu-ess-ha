@@ -2,9 +2,54 @@
   "config": {
     "step": {
       "user": {
-        "title": "Setup Hanchuess",
-        "description": "Configure your Hanchuess device"
+        "title": "Login to Hanchuess",
+        "description": "Enter your Hanchuess account credentials",
+        "data": {
+          "account": "Account",
+          "password": "Password"
+        }
+      },
+      "select_device": {
+        "title": "Select Device",
+        "description": "Choose the device you want to add",
+        "data": {
+          "device": "Device"
+        }
       }
+    },
+    "error": {
+      "auth_failed": "Authentication failed, please check your credentials",
+      "cannot_connect": "Cannot connect to server",
+      "no_devices": "No devices found under this account"
+    },
+    "abort": {
+      "already_configured": "This device is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": { "name": "Device Status" },
+      "battery_soc": { "name": "Battery SOC" },
+      "battery_power": { "name": "Battery Power" },
+      "pv_power": { "name": "PV Power" },
+      "grid_power": { "name": "Grid Power" },
+      "load_power": { "name": "Load Power" },
+      "daily_pv_energy": { "name": "Daily PV Energy" },
+      "daily_charge_energy": { "name": "Daily Charge Energy" },
+      "daily_discharge_energy": { "name": "Daily Discharge Energy" },
+      "daily_grid_import": { "name": "Daily Grid Import" },
+      "daily_grid_export": { "name": "Daily Grid Export" }
+    },
+    "select": {
+      "work_mode": { "name": "Work Mode" }
+    },
+    "number": {
+      "charge_power_limit": { "name": "Charge Power Limit" },
+      "discharge_power_limit": { "name": "Discharge Power Limit" },
+      "soc_min": { "name": "SOC Minimum" }
+    },
+    "switch": {
+      "inverter_switch": { "name": "Inverter" }
     }
   }
 }

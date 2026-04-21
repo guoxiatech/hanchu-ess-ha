@@ -1,69 +1,92 @@
-"""配置流程"""
-import voluptuous as vol
-import aiohttp
+"""Config flow for Hanchuess."""
 import logging
+import voluptuous as vol
 from homeassistant import config_entries
-from .aes_util import encrypt_data
+from .const import DOMAIN, BASE_URL
+from .api import HanchuessApiClient
 
-DOMAIN = "hanchuess"
 _LOGGER = logging.getLogger(__name__)
+
 
 class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
+    def __init__(self):
+        self._domain = None
+        self._token = None
+        self._devices = []
+
     async def async_step_user(self, user_input=None):
+        """Step 1: Login."""
+        # Check if already logged in
+        existing = self.hass.data.get(DOMAIN, {})
+        for entry_data in existing.values():
+            if hasattr(entry_data, "client") and entry_data.client.token:
+                self._token = entry_data.client.token
+                self._domain = entry_data.entry.data["domain"]
+                client = HanchuessApiClient(self._domain, self._token)
+                self._devices = await client.async_get_devices()
+                if self._devices:
+                    return await self.async_step_select_device()
+
         errors = {}
-        
         if user_input is not None:
-            # 验证授权
-            domain = user_input["domain"]
-            device_id = user_input["device_id"]
-            secret_key = user_input["secret_key"]
-            language = self.hass.config.language or "en"
-            
-            url = f"{domain}/gateway/app/ha/auth"
-            _LOGGER.info(f"Attempting auth to {url}")
-            
-            try:
-                # 加密请求数据
-                request_data = {
-                    "language": language,
-                    "domain": domain,
-                    "deviceId": device_id,
-                    "secretKey": secret_key
-                }
-                _LOGGER.info(f"Auth request data before encrypt: {request_data}")
-                encrypted_data = encrypt_data(request_data)
-                _LOGGER.info(f"Auth encrypted data: {encrypted_data}")
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        url, 
-                        data=encrypted_data,
-                        headers={"Content-Type": "text/plain"}
-                    ) as response:
-                        _LOGGER.info(f"Auth response status: {response.status}")
-                        response_text = await response.text()
-                        _LOGGER.info(f"Auth response text: {response_text}")
-                        if response.status == 200:
-                            result = await response.json()
-                            _LOGGER.info(f"Auth response json: {result}")
-                            if result.get("success"):
-                                return self.async_create_entry(
-                                    title=f"Hanchuess {device_id}",
-                                    data=user_input
-                                )
-                        errors["base"] = "auth_failed"
-            except Exception as e:
-                _LOGGER.error(f"Auth error: {e}")
-                errors["base"] = "cannot_connect"
-        
+            client = HanchuessApiClient(BASE_URL)
+            token = await client.async_login(
+                user_input["account"], user_input["password"]
+            )
+            if token:
+                self._token = client.token
+                self._devices = await client.async_get_devices()
+                if self._devices:
+                    return await self.async_step_select_device()
+                errors["base"] = "no_devices"
+            else:
+                errors["base"] = "auth_failed"
+
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
-                vol.Required("domain"): str,
-                vol.Required("device_id"): str,
-                vol.Required("secret_key"): str,
+                vol.Required("account"): str,
+                vol.Required("password"): str,
             }),
-            errors=errors
+            errors=errors,
+        )
+
+    async def async_step_select_device(self, user_input=None):
+        """Step 2: Select device."""
+        errors = {}
+        if user_input is not None:
+            device_id = user_input["device"]
+
+            # Prevent duplicate
+            await self.async_set_unique_id(device_id)
+            self._abort_if_unique_id_configured()
+
+            # Find device name
+            device_name = device_id
+            for device in self._devices:
+                if device.get("deviceId") == device_id:
+                    device_name = device.get("deviceName", device_id)
+                    break
+
+            return self.async_create_entry(
+                title=f"Hanchuess {device_name}",
+                data={
+                    "device_id": device_id,
+                    "token": self._token,
+                },
+            )
+
+        device_options = {
+            d["deviceId"]: d.get("deviceName", d["deviceId"])
+            for d in self._devices
+        }
+
+        return self.async_show_form(
+            step_id="select_device",
+            data_schema=vol.Schema({
+                vol.Required("device"): vol.In(device_options),
+            }),
+            errors=errors,
         )

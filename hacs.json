@@ -1,6 +1,6 @@
 {
   "name": "Hanchuess",
   "render_readme": true,
-  "domains": ["sensor", "select"],
+  "domains": ["sensor", "select", "number", "switch"],
   "homeassistant": "2024.1.0"
 }

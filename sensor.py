@@ -1,129 +1,165 @@
-"""设备状态传感器"""
-import aiohttp
-import async_timeout
-import logging
-from datetime import timedelta
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.entity import EntityCategory
+"""Sensor platform for Hanchuess."""
+from homeassistant.components.sensor import (
+    SensorEntity,
+    SensorDeviceClass,
+    SensorStateClass,
+)
+from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfEnergy
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from .aes_util import encrypt_data
+from .const import DOMAIN
 
-SCAN_INTERVAL = timedelta(seconds=30)
-DOMAIN = "hanchuess"
+SENSORS = {
+    "device_status": {
+        "key": "devStatus",
+        "icon": "mdi:check-circle",
+        "coordinator": "realtime",
+    },
+    "battery_soc": {
+        "key": "batSoc",
+        "device_class": SensorDeviceClass.BATTERY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": PERCENTAGE,
+        "icon": "mdi:battery",
+        "scale": 100,
+        "coordinator": "realtime",
+    },
+    "battery_power": {
+        "key": "batP",
+        "device_class": SensorDeviceClass.POWER,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfPower.WATT,
+        "icon": "mdi:battery-charging",
+        "coordinator": "realtime",
+    },
+    "pv_power": {
+        "key": "pvTtPwr",
+        "device_class": SensorDeviceClass.POWER,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfPower.WATT,
+        "icon": "mdi:solar-power",
+        "coordinator": "realtime",
+    },
+    "grid_power": {
+        "key": "meterPPwr",
+        "device_class": SensorDeviceClass.POWER,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfPower.WATT,
+        "icon": "mdi:transmission-tower",
+        "coordinator": "realtime",
+    },
+    "load_power": {
+        "key": "loadPwr",
+        "device_class": SensorDeviceClass.POWER,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "unit": UnitOfPower.WATT,
+        "icon": "mdi:home-lightning-bolt",
+        "coordinator": "realtime",
+    },
+    "daily_pv_energy": {
+        "key": "dailyPvEnergy",
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
+        "icon": "mdi:solar-power-variant",
+        "coordinator": "statistics",
+    },
+    "daily_charge_energy": {
+        "key": "dailyChargeEnergy",
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
+        "icon": "mdi:battery-plus",
+        "coordinator": "statistics",
+    },
+    "daily_discharge_energy": {
+        "key": "dailyDischargeEnergy",
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
+        "icon": "mdi:battery-minus",
+        "coordinator": "statistics",
+    },
+    "daily_grid_import": {
+        "key": "dailyGridImport",
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
+        "icon": "mdi:transmission-tower-import",
+        "coordinator": "statistics",
+    },
+    "daily_grid_export": {
+        "key": "dailyGridExport",
+        "device_class": SensorDeviceClass.ENERGY,
+        "state_class": SensorStateClass.TOTAL_INCREASING,
+        "unit": UnitOfEnergy.KILO_WATT_HOUR,
+        "icon": "mdi:transmission-tower-export",
+        "coordinator": "statistics",
+    },
+}
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    coordinator = DeviceDataCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
-    
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = coordinator
-    
-    async_add_entities([DeviceStatusSensor(coordinator, entry)])
+STATUS_MAP = {
+    0: "offline",
+    1: "online",
+    99: "pending",
+}
 
-class DeviceDataCoordinator(DataUpdateCoordinator):
-    """数据协调器"""
-    def __init__(self, hass, entry):
-        super().__init__(
-            hass,
-            logging.getLogger(__name__),
-            name="hanchuess",
-            update_interval=SCAN_INTERVAL
-        )
-        self.entry = entry
-        
-    async def _async_update_data(self):
-        _LOGGER = logging.getLogger(__name__)
-        
-        domain = self.entry.data["domain"]
-        device_id = self.entry.data["device_id"]
-        language = self.hass.config.language or "en"
-        
-        url = f"{domain}/gateway/app/ha/getDeviceStatus"
-        _LOGGER.info(f"[Sensor] Requesting {url}")
-        
-        try:
-            async with async_timeout.timeout(10):
-                # 加密请求数据
-                request_data = {
-                    "language": language,
-                    "deviceId": device_id
-                }
-                _LOGGER.info(f"[Sensor] Request data before encrypt: {request_data}")
-                encrypted_data = encrypt_data(request_data)
-                _LOGGER.info(f"[Sensor] Encrypted data: {encrypted_data}")
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        url, 
-                        data=encrypted_data,
-                        headers={"Content-Type": "text/plain"}
-                    ) as response:
-                        _LOGGER.info(f"[Sensor] Response status: {response.status}")
-                        response_text = await response.text()
-                        _LOGGER.info(f"[Sensor] Response text: {response_text}")
-                        if response.status == 200:
-                            result = await response.json()
-                            _LOGGER.info(f"[Sensor] Response json: {result}")
-                            if result.get("success"):
-                                data = result.get("data", {})
-                                dev_status = data.get("devStatus")
-                                try:
-                                    dev_status = int(dev_status)
-                                except (ValueError, TypeError):
-                                    dev_status = None
-                                
-                                if dev_status == 1:
-                                    data["_status"] = "在线"
-                                elif dev_status == 0:
-                                    data["_status"] = "离线"
-                                elif dev_status == 99:
-                                    data["_status"] = "待接入"
-                                else:
-                                    data["_status"] = "未知"
-                                return data
-        except Exception as e:
-            _LOGGER.error(f"[Sensor] Error: {e}")
-        return {"_status": "离线"}
 
-class DeviceStatusSensor(SensorEntity):
-    _attr_name = "状态"
-    _attr_icon = "mdi:check-circle"
-    
-    def __init__(self, coordinator, entry):
-        self.coordinator = coordinator
-        self._attr_unique_id = f"{entry.entry_id}_status"
-    
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+):
+    coordinators = hass.data[DOMAIN][entry.entry_id]
+    entities = []
+    for sensor_key, config in SENSORS.items():
+        coordinator = coordinators[config["coordinator"]]
+        if config["key"] in coordinator.data:
+            entities.append(HanchueSensor(coordinator, entry, sensor_key, config))
+    async_add_entities(entities)
+
+
+class HanchueSensor(CoordinatorEntity, SensorEntity):
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, entry, sensor_key, config):
+        super().__init__(coordinator)
+        self._entry = entry
+        self._sensor_key = sensor_key
+        self._config = config
+        self._attr_translation_key = sensor_key
+        self._attr_unique_id = f"{entry.entry_id}_{sensor_key}"
+        self._attr_icon = config.get("icon")
+        if "device_class" in config:
+            self._attr_device_class = config["device_class"]
+        if "state_class" in config:
+            self._attr_state_class = config["state_class"]
+        if "unit" in config:
+            self._attr_native_unit_of_measurement = config["unit"]
+
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.entry.entry_id)},
-            name=f"Hanchuess {self.coordinator.entry.data['device_id']}",
+            identifiers={(DOMAIN, self._entry.data["device_id"])},
+            name=f"Hanchuess {self._entry.data['device_id']}",
             manufacturer="Hanchuess",
             model="ESS Device",
         )
-    
+
     @property
-    def extra_state_attributes(self):
-        data = self.coordinator.data
-        soc = data.get("batSoc")
-        if soc is not None:
-            soc = f"{int(soc * 100)}%"
-        
-        return {
-            "电池电量": soc,
-            "电池功率": f"{data.get('batP', 0)} {data.get('batPUnit', 'W')}",
-            "负载功率": f"{data.get('loadPwr', 0)} W",
-            "光伏功率": f"{data.get('pvTtPwr', 0)} {data.get('pvTtPwrUnit', 'W')}",
-            "电网功率": f"{data.get('meterPPwr', 0)} {data.get('meterPPwrUnit', 'W')}",
-            "工作模式": data.get("deviceStatusDes", "-"),
-            "设备序列号": data.get("sn", "-"),
-        }
-
-    async def async_update(self):
-        await self.coordinator.async_request_refresh()
-        self._attr_native_value = self.coordinator.data.get("_status", "未知")
-
+    def native_value(self):
+        value = self.coordinator.data.get(self._config["key"])
+        if value is None:
+            return None
+        if self._sensor_key == "device_status":
+            try:
+                return STATUS_MAP.get(int(value), "unknown")
+            except (ValueError, TypeError):
+                return "unknown"
+        if "scale" in self._config:
+            try:
+                return round(float(value) * self._config["scale"], 1)
+            except (ValueError, TypeError):
+                return None
+        return value
