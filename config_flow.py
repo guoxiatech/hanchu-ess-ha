@@ -59,8 +59,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step 2: Select devices (multi-select)."""
         errors = {}
         if user_input is not None:
-            # multi_select returns {sn: True/False}
-            selected = [k for k, v in user_input.get("devices", {}).items() if v]
+            selected = user_input.get("devices", [])
             if not selected:
                 errors["base"] = "no_devices"
             else:
@@ -69,12 +68,30 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(sn)
                 self._abort_if_unique_id_configured()
 
+                # Find devType
+                dev_type = "2"
+                for d in self._devices:
+                    if d["sn"] == sn:
+                        dev_type = d.get("devType", "2")
+                        break
+
+                # Build pending devices with devType
+                pending = []
+                for p_sn in selected[1:]:
+                    p_type = "2"
+                    for d in self._devices:
+                        if d["sn"] == p_sn:
+                            p_type = d.get("devType", "2")
+                            break
+                    pending.append({"sn": p_sn, "devType": p_type})
+
                 return self.async_create_entry(
                     title=f"Hanchuess {sn}" if len(selected) == 1 else f"Hanchuess ({len(selected)} devices)",
                     data={
                         "device_id": sn,
+                        "dev_type": dev_type,
                         "token": self._token,
-                        "pending_devices": selected[1:] if len(selected) > 1 else [],
+                        "pending_devices": pending,
                     },
                 )
 
@@ -109,6 +126,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title=f"Hanchuess {sn}",
             data={
                 "device_id": sn,
+                "dev_type": data.get("dev_type", "2"),
                 "token": data["token"],
                 "pending_devices": [],
             },

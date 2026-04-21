@@ -35,11 +35,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Auto-create entries for remaining selected devices
     pending = entry.data.get("pending_devices", [])
     if pending:
-        for sn in pending:
+        for item in pending:
             await hass.config_entries.flow.async_init(
                 DOMAIN,
                 context={"source": "import"},
-                data={"device_id": sn, "token": entry.data["token"]},
+                data={
+                    "device_id": item["sn"],
+                    "dev_type": item.get("devType", "2"),
+                    "token": entry.data["token"],
+                },
             )
         # Remove pending_devices from entry data
         new_data = {k: v for k, v in entry.data.items() if k != "pending_devices"}
