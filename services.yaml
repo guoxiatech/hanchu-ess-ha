@@ -1,0 +1,16 @@
+device_control:
+  name: Device Control
+  description: Send control commands to a Hanchuess device
+  fields:
+    device_id:
+      name: Device ID
+      description: The SN of the device
+      required: true
+      selector:
+        text:
+    value_map:
+      name: Value Map
+      description: Key-value pairs of control signals
+      required: true
+      selector:
+        object:

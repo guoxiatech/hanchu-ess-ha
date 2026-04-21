@@ -56,6 +56,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
         self._work_mode_options = []
         self._signal = "WORK_MODE_CMB"
+        self._menu_loaded = False
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -65,6 +66,10 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
             manufacturer="Hanchuess",
             model="ESS Device",
         )
+
+    @property
+    def extra_state_attributes(self):
+        return {"device_id": self._entry.data["device_id"]}
 
     @property
     def available(self) -> bool:
@@ -93,8 +98,9 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         await self._refresh_menu()
 
     async def async_update(self) -> None:
-        """Called every time HA UI requests entity state. Refresh menu."""
-        await self._refresh_menu()
+        """Called every time HA UI requests entity state."""
+        if not self._menu_loaded:
+            await self._refresh_menu()
         await super().async_update()
 
     async def _refresh_menu(self) -> None:
@@ -105,6 +111,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         if options:
             self._work_mode_options = options
             self._signal = options[0].get("signal", "WORK_MODE_CMB")
+            self._menu_loaded = True
 
     async def async_select_option(self, option: str) -> None:
         for opt in self._work_mode_options:

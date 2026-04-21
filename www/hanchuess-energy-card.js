@@ -1,0 +1,244 @@
+// ===== Card Editor =====
+class HanchuessEnergyCardEditor extends HTMLElement {
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._rendered) this._render();
+  }
+
+  setConfig(config) {
+    this._config = config;
+  }
+
+  _render() {
+    this._rendered = true;
+    this.innerHTML = "";
+
+    const entities = Object.keys(this._hass.states)
+      .filter(eid => eid.startsWith("select.") && eid.includes("work_mode"));
+
+    this.innerHTML = `
+      <div style="padding: 8px;">
+        <p><b>设备</b></p>
+        <select id="entity_select" style="width:100%;padding:8px;margin-bottom:12px;">
+          <option value="">请选择设备</option>
+          ${entities.map(eid => {
+            const state = this._hass.states[eid];
+            const name = state.attributes.friendly_name || eid;
+            const selected = this._config.entity === eid ? "selected" : "";
+            return `<option value="${eid}" ${selected}>${name}</option>`;
+          }).join("")}
+        </select>
+      </div>
+    `;
+
+    this.querySelector("#entity_select").addEventListener("change", (e) => {
+      const entityId = e.target.value;
+      const state = this._hass.states[entityId];
+      const deviceId = state && state.attributes ? (state.attributes.device_id || "") : "";
+
+      this.dispatchEvent(new CustomEvent("config-changed", {
+        detail: { config: { ...this._config, entity: entityId, device_id: deviceId } },
+        bubbles: true,
+        composed: true,
+      }));
+    });
+  }
+}
+customElements.define("hanchuess-energy-card-editor", HanchuessEnergyCardEditor);
+
+// ===== Card =====
+class HanchuessEnergyCard extends HTMLElement {
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._initialized) {
+      this._render();
+      this._initialized = true;
+    }
+    this._updateValues();
+  }
+
+  setConfig(config) {
+    if (!config.entity) throw new Error("Please define an entity");
+    this._config = config;
+    this._initialized = false;
+  }
+
+  static getConfigElement() {
+    return document.createElement("hanchuess-energy-card-editor");
+  }
+
+  static getStubConfig() {
+    return { entity: "", device_id: "" };
+  }
+
+  _render() {
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        ha-card { padding: 16px; }
+        .title { font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+        .field { margin-bottom: 12px; }
+        .field label { display: block; font-size: 13px; color: var(--secondary-text-color); margin-bottom: 4px; }
+        .field select, .field input {
+          width: 100%; padding: 8px; border: 1px solid var(--divider-color);
+          border-radius: 4px; background: var(--card-background-color);
+          color: var(--primary-text-color); font-size: 14px; box-sizing: border-box;
+        }
+        .time-group { display: flex; align-items: center; gap: 8px; }
+        .time-group input { flex: 1; }
+        .time-group span { color: var(--secondary-text-color); }
+        .tou-fields { display: none; }
+        .tou-fields.visible { display: block; }
+        .section-title { font-size: 14px; font-weight: 500; margin: 16px 0 8px; color: var(--primary-color); }
+        .submit-btn {
+          width: 100%; padding: 10px; margin-top: 16px; border: none; border-radius: 4px;
+          background: var(--primary-color); color: white; font-size: 14px; cursor: pointer;
+        }
+        .submit-btn:hover { opacity: 0.9; }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; text-align: center; }
+        .status.error { color: var(--error-color); }
+        .status.success { color: var(--success-color, #4caf50); }
+      </style>
+      <ha-card>
+        <div class="title">储能设置</div>
+
+        <div class="field">
+          <label>工作模式</label>
+          <select id="work_mode"></select>
+        </div>
+
+        <div id="tou_fields" class="tou-fields">
+          <div class="section-title">充电时间段 1</div>
+          <div class="field">
+            <div class="time-group">
+              <input type="time" id="chg_start_1" value="00:00">
+              <span>—</span>
+              <input type="time" id="chg_end_1" value="00:00">
+            </div>
+          </div>
+
+          <div class="section-title">放电时间段 1</div>
+          <div class="field">
+            <div class="time-group">
+              <input type="time" id="dschg_start_1" value="00:00">
+              <span>—</span>
+              <input type="time" id="dschg_end_1" value="00:00">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>充电功率限值（W）</label>
+            <input type="number" id="chg_pwr_lmt" min="0" max="8000" value="0">
+          </div>
+
+          <div class="field">
+            <label>放电功率限值（W）</label>
+            <input type="number" id="dschg_pwr_lmt" min="0" max="8000" value="0">
+          </div>
+        </div>
+
+        <button class="submit-btn" id="submit_btn">提交</button>
+        <div class="status" id="status_msg"></div>
+      </ha-card>
+    `;
+
+    this.shadowRoot.getElementById("work_mode").addEventListener("change", (e) => {
+      this._toggleTouFields(e.target.value);
+    });
+
+    this.shadowRoot.getElementById("submit_btn").addEventListener("click", () => {
+      this._submit();
+    });
+  }
+
+  _updateValues() {
+    if (!this._hass || !this._config) return;
+
+    const state = this._hass.states[this._config.entity];
+    if (!state) return;
+
+    const select = this.shadowRoot.getElementById("work_mode");
+    const options = state.attributes.options || [];
+    const current = state.state;
+
+    if (select.options.length !== options.length) {
+      select.innerHTML = options.map(opt =>
+        `<option value="${opt}" ${opt === current ? "selected" : ""}>${opt}</option>`
+      ).join("");
+    } else {
+      select.value = current;
+    }
+
+    this._toggleTouFields(current);
+  }
+
+  _toggleTouFields(mode) {
+    const touFields = this.shadowRoot.getElementById("tou_fields");
+    const isTou = mode === "分时充放" || mode === "Time of Use" || mode === "TOU";
+    touFields.classList.toggle("visible", isTou);
+  }
+
+  _timeToSignal(timeStr) {
+    return timeStr.replace(":", "");
+  }
+
+  async _submit() {
+    const btn = this.shadowRoot.getElementById("submit_btn");
+    const statusMsg = this.shadowRoot.getElementById("status_msg");
+    btn.disabled = true;
+    statusMsg.textContent = "提交中...";
+    statusMsg.className = "status";
+
+    const entityId = this._config.entity;
+    const deviceId = this._config.device_id;
+    const workMode = this.shadowRoot.getElementById("work_mode").value;
+
+    try {
+      // Set work mode
+      await this._hass.callService("select", "select_option", {
+        entity_id: entityId,
+        option: workMode,
+      });
+
+      // If TOU mode, submit time and power fields
+      const isTou = workMode === "分时充放" || workMode === "Time of Use" || workMode === "TOU";
+      if (isTou) {
+        await this._hass.callService("hanchuess", "device_control", {
+          device_id: deviceId,
+          value_map: {
+            "TCT_START_1": this._timeToSignal(this.shadowRoot.getElementById("chg_start_1").value),
+            "TCT_END_1": this._timeToSignal(this.shadowRoot.getElementById("chg_end_1").value),
+            "TDT_START_1": this._timeToSignal(this.shadowRoot.getElementById("dschg_start_1").value),
+            "TDT_END_1": this._timeToSignal(this.shadowRoot.getElementById("dschg_end_1").value),
+            "CHG_PWR_LMT": this.shadowRoot.getElementById("chg_pwr_lmt").value,
+            "DSCHG_PWR_LMT": this.shadowRoot.getElementById("dschg_pwr_lmt").value,
+          },
+        });
+      }
+
+      statusMsg.textContent = "提交成功";
+      statusMsg.className = "status success";
+    } catch (err) {
+      statusMsg.textContent = "提交失败: " + err.message;
+      statusMsg.className = "status error";
+    }
+
+    btn.disabled = false;
+    setTimeout(() => { statusMsg.textContent = ""; }, 3000);
+  }
+
+  getCardSize() {
+    return 4;
+  }
+}
+customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "hanchuess-energy-card",
+  name: "Hanchuess Energy Settings",
+  description: "Control energy settings for Hanchuess inverter",
+});

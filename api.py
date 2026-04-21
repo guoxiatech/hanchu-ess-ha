@@ -38,7 +38,7 @@ class HanchuessApiClient:
 
     async def _request(self, path: str, data: dict, language: str = None) -> dict:
         url = f"{self._domain}{path}"
-        _LOGGER.info("[HANCHUESS] request: %s token=%s", url, "yes" if self._token else "no")
+        _LOGGER.debug("[HANCHUESS] request: %s token=%s", url, "yes" if self._token else "no")
         try:
             async with async_timeout.timeout(10):
                 async with aiohttp.ClientSession() as session:
@@ -46,7 +46,7 @@ class HanchuessApiClient:
                         url, json=data, headers=self._headers(language)
                     ) as response:
                         response_text = await response.text()
-                        _LOGGER.info("[HANCHUESS] response: %s status=%s body=%s", path, response.status, response_text[:500])
+                        _LOGGER.debug("[HANCHUESS] response: %s status=%s body=%s", path, response.status, response_text[:500])
                         if response.status == 401:
                             return {"success": False, "code": 401}
                         if response.status == 200:
@@ -54,6 +54,7 @@ class HanchuessApiClient:
                             if result.get("code") == 401:
                                 return {"success": False, "code": 401}
                             return result
+                        _LOGGER.error("[HANCHUESS] unexpected status: %s %s", response.status, response_text[:200])
         except TimeoutError:
             _LOGGER.error("[HANCHUESS] Request timeout: %s", url)
         except Exception as err:
@@ -65,7 +66,7 @@ class HanchuessApiClient:
             "/gateway/identify/auth/token",
             {"account": account, "pwd": password},
         )
-        _LOGGER.info("[HANCHUESS] login response: %s", result)
+        _LOGGER.info("[HANCHUESS] login: %s", "success" if result and result.get("success") else "failed")
         if result and result.get("success"):
             self._token = result.get("data")
             self._token_time = time.time()
@@ -87,11 +88,10 @@ class HanchuessApiClient:
         return (time.time() - self._token_time) >= TOKEN_REFRESH_SECONDS
 
     async def async_get_devices(self) -> list:
-        _LOGGER.info("[HANCHUESS] getDeviceList token: %s", self._token[:20] if self._token else "None")
         result = await self._request(
             "/gateway/app/ha/getDeviceList", {}
         )
-        _LOGGER.info("[HANCHUESS] getDeviceList response: %s", result)
+        _LOGGER.info("[HANCHUESS] getDeviceList: %d devices", len(result.get("data", [])) if result else 0)
         if result and result.get("success"):
             return result.get("data", [])
         return []
