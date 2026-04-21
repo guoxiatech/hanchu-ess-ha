@@ -59,6 +59,7 @@ class HanchuessApiClient:
             "/gateway/identify/auth/token",
             {"account": account, "pwd": password},
         )
+        _LOGGER.info("[HANCHUESS] login response: %s", result)
         if result and result.get("success"):
             self._token = result.get("data")
             self._token_time = time.time()
@@ -83,6 +84,7 @@ class HanchuessApiClient:
         result = await self._request(
             "/gateway/app/ha/getDeviceList", {}
         )
+        _LOGGER.info("[HANCHUESS] getDeviceList response: %s", result)
         if result and result.get("success"):
             return result.get("data", [])
         return []
