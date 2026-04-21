@@ -83,6 +83,11 @@ class HanchuessEnergyCard extends HTMLElement {
         :host { display: block; }
         ha-card { padding: 16px; }
         .title { font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+        .title .sn { color: var(--primary-color); }
+        .offline-banner {
+          background: var(--error-color, #db4437); color: white; padding: 8px 12px;
+          border-radius: 4px; margin-bottom: 12px; text-align: center; font-size: 14px;
+        }
         .field { margin-bottom: 12px; }
         .field label { display: block; font-size: 13px; color: var(--secondary-text-color); margin-bottom: 4px; }
         .field select, .field input {
@@ -108,7 +113,8 @@ class HanchuessEnergyCard extends HTMLElement {
         .no-entity { padding: 16px; color: var(--secondary-text-color); text-align: center; }
       </style>
       <ha-card>
-        <div class="title">储能设置</div>
+        <div class="title">储能设置 - <span id="device_sn" class="sn"></span></div>
+        <div id="offline_banner" class="offline-banner" style="display:none">设备离线，无法设置</div>
 
         <div class="field">
           <label>工作模式</label>
@@ -164,6 +170,19 @@ class HanchuessEnergyCard extends HTMLElement {
 
     const state = this._hass.states[this._config.entity];
     if (!state) return;
+
+    // Show device SN
+    const snEl = this.shadowRoot.getElementById("device_sn");
+    if (snEl) snEl.textContent = this._config.device_id || "";
+
+    // Check online status
+    const isOnline = state.state !== "unavailable";
+    const offlineBanner = this.shadowRoot.getElementById("offline_banner");
+    const submitBtn = this.shadowRoot.getElementById("submit_btn");
+    const workModeSelect = this.shadowRoot.getElementById("work_mode");
+    if (offlineBanner) offlineBanner.style.display = isOnline ? "none" : "block";
+    if (submitBtn) submitBtn.disabled = !isOnline;
+    if (workModeSelect) workModeSelect.disabled = !isOnline;
 
     const select = this.shadowRoot.getElementById("work_mode");
     if (!select) return;
