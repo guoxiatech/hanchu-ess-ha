@@ -1,5 +1,6 @@
 """Hanchuess Home Assistant integration."""
 import logging
+import os
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -19,6 +20,14 @@ SERVICE_SCHEMA = vol.Schema({
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+
+    # Register static path for custom card
+    hass.http.register_static_path(
+        "/hacsfiles/hanchuess",
+        os.path.join(os.path.dirname(__file__), "www"),
+        cache_headers=False,
+    )
+
     return True
 
 
