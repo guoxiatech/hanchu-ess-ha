@@ -35,23 +35,26 @@ class HanchuessApiClient:
 
     async def _request(self, path: str, data: dict, language: str = None) -> dict:
         url = f"{self._domain}{path}"
+        _LOGGER.info("[HANCHUESS] request: %s token=%s", url, "yes" if self._token else "no")
         try:
             async with async_timeout.timeout(10):
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
                         url, json=data, headers=self._headers(language)
                     ) as response:
+                        response_text = await response.text()
+                        _LOGGER.info("[HANCHUESS] response: %s status=%s body=%s", path, response.status, response_text[:500])
                         if response.status == 401:
                             return {"success": False, "code": 401}
                         if response.status == 200:
-                            result = await response.json()
+                            result = await response.json(content_type=None)
                             if result.get("code") == 401:
                                 return {"success": False, "code": 401}
                             return result
         except TimeoutError:
-            _LOGGER.error("Request timeout: %s", url)
-        except aiohttp.ClientError as err:
-            _LOGGER.error("Request error: %s - %s", url, err)
+            _LOGGER.error("[HANCHUESS] Request timeout: %s", url)
+        except Exception as err:
+            _LOGGER.error("[HANCHUESS] Request error: %s - %s", url, err)
         return None
 
     async def async_login(self, account: str, password: str) -> str | None:
@@ -81,6 +84,7 @@ class HanchuessApiClient:
         return (time.time() - self._token_time) >= TOKEN_REFRESH_SECONDS
 
     async def async_get_devices(self) -> list:
+        _LOGGER.info("[HANCHUESS] getDeviceList token: %s", self._token[:20] if self._token else "None")
         result = await self._request(
             "/gateway/app/ha/getDeviceList", {}
         )
