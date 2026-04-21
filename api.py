@@ -30,6 +30,9 @@ class HanchuessApiClient:
         if self._token:
             headers["access-token"] = self._token
         if language:
+            # HA returns zh-Hans/zh-Hant, server expects zh
+            if language.startswith("zh"):
+                language = "zh"
             headers["locale"] = language
         return headers
 
