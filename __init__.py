@@ -32,8 +32,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     ])
 
     # Auto inject card JS into frontend
-    hass.data.setdefault("frontend_extra_module_url", set())
-    hass.data["frontend_extra_module_url"].add("/hacsfiles/hanchuess/hanchuess-energy-card.js")
+    from homeassistant.components.frontend import add_extra_js_url
+    add_extra_js_url(hass, "/hacsfiles/hanchuess/hanchuess-energy-card.js")
 
     return True
 
