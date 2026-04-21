@@ -22,17 +22,39 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     # Register static path for custom card
-    hass.http.register_static_path(
-        "/hacsfiles/hanchuess",
-        os.path.join(os.path.dirname(__file__), "www"),
-        cache_headers=False,
-    )
+    from homeassistant.components.http import StaticPathConfig
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(
+            "/hacsfiles/hanchuess",
+            os.path.join(os.path.dirname(__file__), "www"),
+            cache_headers=False,
+        )
+    ])
 
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
+
+    # Auto register card resource (only once)
+    if not hass.data[DOMAIN].get("_card_registered"):
+        try:
+            from homeassistant.components.lovelace import DOMAIN as LOVELACE_DOMAIN
+            lovelace = hass.data.get(LOVELACE_DOMAIN)
+            if lovelace and "resources" in lovelace:
+                resources = lovelace["resources"]
+                card_url = "/hacsfiles/hanchuess/hanchuess-energy-card.js"
+                existing = [r for r in resources.async_items() if "hanchuess-energy-card" in r.get("url", "")]
+                if not existing:
+                    await resources.async_create_item({
+                        "res_type": "module",
+                        "url": card_url,
+                    })
+                    _LOGGER.info("[HANCHUESS] Card resource registered")
+            hass.data[DOMAIN]["_card_registered"] = True
+        except Exception as err:
+            _LOGGER.warning("[HANCHUESS] Card resource auto-register failed: %s", err)
 
     client = HanchuessApiClient(
         domain=BASE_URL,
