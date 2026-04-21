@@ -21,13 +21,15 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Check if already logged in
         existing = self.hass.data.get(DOMAIN, {})
         for entry_data in existing.values():
-            if hasattr(entry_data, "client") and entry_data.client.token:
-                self._token = entry_data.client.token
-                self._domain = entry_data.entry.data["domain"]
-                client = HanchuessApiClient(self._domain, self._token)
-                self._devices = await client.async_get_devices()
-                if self._devices:
-                    return await self.async_step_select_device()
+            if isinstance(entry_data, dict) and "realtime" in entry_data:
+                coordinator = entry_data["realtime"]
+                if coordinator.client.token:
+                    self._token = coordinator.client.token
+                    client = HanchuessApiClient(BASE_URL, self._token)
+                    self._devices = await client.async_get_devices()
+                    if self._devices:
+                        return await self.async_step_select_device()
+                    break
 
         errors = {}
         if user_input is not None:
@@ -57,31 +59,29 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step 2: Select device."""
         errors = {}
         if user_input is not None:
-            device_id = user_input["device"]
+            sn = user_input["device"]
 
             # Prevent duplicate
-            await self.async_set_unique_id(device_id)
+            await self.async_set_unique_id(sn)
             self._abort_if_unique_id_configured()
 
-            # Find device name
-            device_name = device_id
-            for device in self._devices:
-                if device.get("deviceId") == device_id:
-                    device_name = device.get("deviceName", device_id)
-                    break
-
             return self.async_create_entry(
-                title=f"Hanchuess {device_name}",
+                title=f"Hanchuess {sn}",
                 data={
-                    "device_id": device_id,
+                    "device_id": sn,
                     "token": self._token,
                 },
             )
 
+        # Only show inverters (devType=2) for now
         device_options = {
-            d["deviceId"]: d.get("deviceName", d["deviceId"])
+            d["sn"]: d["sn"]
             for d in self._devices
+            if d.get("devType") == "2"
         }
+
+        if not device_options:
+            return self.async_abort(reason="no_devices")
 
         return self.async_show_form(
             step_id="select_device",

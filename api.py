@@ -22,22 +22,24 @@ class HanchuessApiClient:
     def token(self) -> str:
         return self._token
 
-    def _headers(self) -> dict:
+    def _headers(self, language: str = None) -> dict:
         headers = {
             "Content-Type": "application/json",
             "appPlat": "ha",
         }
         if self._token:
             headers["access-token"] = self._token
+        if language:
+            headers["locale"] = language
         return headers
 
-    async def _request(self, path: str, data: dict) -> dict:
+    async def _request(self, path: str, data: dict, language: str = None) -> dict:
         url = f"{self._domain}{path}"
         try:
             async with async_timeout.timeout(10):
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
-                        url, json=data, headers=self._headers()
+                        url, json=data, headers=self._headers(language)
                     ) as response:
                         if response.status == 401:
                             return {"success": False, "code": 401}
@@ -88,7 +90,8 @@ class HanchuessApiClient:
     async def async_get_device_status(self, device_id: str, language: str = "en") -> dict | None:
         result = await self._request(
             "/gateway/app/ha/getDeviceStatus",
-            {"deviceId": device_id, "language": language},
+            {"deviceId": device_id},
+            language=language,
         )
         if result and result.get("code") == 401:
             return {"_token_expired": True}
@@ -99,7 +102,8 @@ class HanchuessApiClient:
     async def async_get_device_statistics(self, device_id: str, language: str = "en") -> dict | None:
         result = await self._request(
             "/gateway/app/ha/getDeviceStatistics",
-            {"deviceId": device_id, "language": language},
+            {"deviceId": device_id},
+            language=language,
         )
         if result and result.get("code") == 401:
             return {"_token_expired": True}
