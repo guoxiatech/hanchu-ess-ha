@@ -1,6 +1,7 @@
 """Config flow for Hanchuess."""
 import logging
 import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
 from homeassistant import config_entries
 from .const import DOMAIN, BASE_URL
 from .api import HanchuessApiClient
@@ -58,7 +59,8 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step 2: Select devices (multi-select)."""
         errors = {}
         if user_input is not None:
-            selected = user_input.get("devices", [])
+            # multi_select returns {sn: True/False}
+            selected = [k for k, v in user_input.get("devices", {}).items() if v]
             if not selected:
                 errors["base"] = "no_devices"
             else:
@@ -93,9 +95,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="select_device",
             data_schema=vol.Schema({
-                vol.Required("devices"): vol.All(
-                    [vol.In(available)],
-                ),
+                vol.Required("devices"): cv.multi_select(available),
             }),
             errors=errors,
         )
