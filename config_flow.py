@@ -12,7 +12,6 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self):
-        self._domain = None
         self._token = None
         self._devices = []
 
@@ -56,37 +55,61 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select_device(self, user_input=None):
-        """Step 2: Select device."""
+        """Step 2: Select devices (multi-select)."""
         errors = {}
         if user_input is not None:
-            sn = user_input["device"]
+            selected = user_input.get("devices", [])
+            if not selected:
+                errors["base"] = "no_devices"
+            else:
+                # Create entry for the first device
+                sn = selected[0]
+                await self.async_set_unique_id(sn)
+                self._abort_if_unique_id_configured()
 
-            # Prevent duplicate
-            await self.async_set_unique_id(sn)
-            self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title=f"Hanchuess {sn}" if len(selected) == 1 else f"Hanchuess ({len(selected)} devices)",
+                    data={
+                        "device_id": sn,
+                        "token": self._token,
+                        "pending_devices": selected[1:] if len(selected) > 1 else [],
+                    },
+                )
 
-            return self.async_create_entry(
-                title=f"Hanchuess {sn}",
-                data={
-                    "device_id": sn,
-                    "token": self._token,
-                },
-            )
+        # Filter inverters and exclude already configured
+        configured_ids = set()
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            configured_ids.add(entry.data.get("device_id"))
 
-        # Only show inverters (devType=2) for now
-        device_options = {
+        available = {
             d["sn"]: d["sn"]
             for d in self._devices
-            if d.get("devType") == "2"
+            if d.get("devType") == "2" and d["sn"] not in configured_ids
         }
 
-        if not device_options:
+        if not available:
             return self.async_abort(reason="no_devices")
 
         return self.async_show_form(
             step_id="select_device",
             data_schema=vol.Schema({
-                vol.Required("device"): vol.In(device_options),
+                vol.Required("devices"): vol.All(
+                    [vol.In(available)],
+                ),
             }),
             errors=errors,
+        )
+
+    async def async_step_import(self, data: dict):
+        """Handle creation of additional devices from pending list."""
+        sn = data["device_id"]
+        await self.async_set_unique_id(sn)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title=f"Hanchuess {sn}",
+            data={
+                "device_id": sn,
+                "token": data["token"],
+                "pending_devices": [],
+            },
         )

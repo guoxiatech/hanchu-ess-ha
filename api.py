@@ -111,6 +111,16 @@ class HanchuessApiClient:
             return result.get("data", {})
         return {}
 
+    async def async_get_menu(self, sn: str, language: str = "en") -> dict:
+        result = await self._request(
+            "/gateway/app/ha/menu",
+            {"sn": sn},
+            language=language,
+        )
+        if result and result.get("code") == 200:
+            return result
+        return {}
+
     async def async_device_control(self, device_id: str, value_map: dict) -> bool | str:
         result = await self._request(
             "/gateway/app/ha/deviceControl",

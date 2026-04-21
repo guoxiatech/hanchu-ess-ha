@@ -10,10 +10,10 @@
         }
       },
       "select_device": {
-        "title": "Select Device",
-        "description": "Choose the device you want to add",
+        "title": "Select Devices",
+        "description": "Choose the devices you want to add",
         "data": {
-          "device": "Device"
+          "devices": "Devices"
         }
       }
     },

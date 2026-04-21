@@ -11,9 +11,9 @@
       },
       "select_device": {
         "title": "选择设备",
-        "description": "选择要添加的设备",
+        "description": "选择要添加的设备（可多选）",
         "data": {
-          "device": "设备"
+          "devices": "设备"
         }
       }
     },

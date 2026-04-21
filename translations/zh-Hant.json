@@ -11,9 +11,9 @@
       },
       "select_device": {
         "title": "選擇設備",
-        "description": "選擇要新增的設備",
+        "description": "選擇要新增的設備（可多選）",
         "data": {
-          "device": "設備"
+          "devices": "設備"
         }
       }
     },

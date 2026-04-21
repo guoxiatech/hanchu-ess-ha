@@ -1,4 +1,5 @@
 """Select platform for Hanchuess."""
+import json
 import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
@@ -11,15 +12,29 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _parse_work_mode_options(menu_data: dict) -> list:
+    energy = menu_data.get("data", {}).get("energy", {})
+    for group in energy.get("items", []):
+        for item in group:
+            if item.get("itemCode") == "work_mode" and item.get("itemType") == "3":
+                try:
+                    options = json.loads(item.get("optVal", "[]"))
+                    return [
+                        {"label": opt["name"], "value": opt["value"],
+                         "signal": item.get("itemCodeSignal", "WORK_MODE_CMB")}
+                        for opt in options
+                    ]
+                except (json.JSONDecodeError, KeyError):
+                    _LOGGER.error("Failed to parse work mode options")
+    return []
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    coordinators = hass.data[DOMAIN][entry.entry_id]
-    coordinator = coordinators["realtime"]
-    entities = []
-    if "workModeOptions" in coordinator.data:
-        entities.append(WorkModeSelect(coordinator, entry))
-    async_add_entities(entities)
+    data = hass.data[DOMAIN][entry.entry_id]
+    coordinator = data["realtime"]
+    async_add_entities([WorkModeSelect(coordinator, entry)])
 
 
 class WorkModeSelect(CoordinatorEntity, SelectEntity):
@@ -31,6 +46,8 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_work_mode"
+        self._work_mode_options = []
+        self._signal = "WORK_MODE_CMB"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -43,19 +60,42 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        opts = self.coordinator.data.get("workModeOptions", [])
-        return [opt["label"] for opt in opts]
+        if not self._work_mode_options:
+            return []
+        return [opt["label"] for opt in self._work_mode_options]
 
     @property
     def current_option(self) -> str | None:
         current = self.coordinator.data.get("workModeCmb")
-        for opt in self.coordinator.data.get("workModeOptions", []):
-            if opt["value"] == current:
+        if current is None:
+            return None
+        current_str = str(current)
+        for opt in self._work_mode_options:
+            if str(opt["value"]) == current_str:
                 return opt["label"]
         return None
 
+    async def async_added_to_hass(self) -> None:
+        """Called when entity is added to HA. Fetch menu on first load."""
+        await super().async_added_to_hass()
+        await self._refresh_menu()
+
+    async def async_update(self) -> None:
+        """Called every time HA UI requests entity state. Refresh menu."""
+        await self._refresh_menu()
+        await super().async_update()
+
+    async def _refresh_menu(self) -> None:
+        language = self.hass.config.language or "en"
+        device_id = self._entry.data["device_id"]
+        menu_data = await self.coordinator.client.async_get_menu(device_id, language)
+        options = _parse_work_mode_options(menu_data)
+        if options:
+            self._work_mode_options = options
+            self._signal = options[0].get("signal", "WORK_MODE_CMB")
+
     async def async_select_option(self, option: str) -> None:
-        for opt in self.coordinator.data.get("workModeOptions", []):
+        for opt in self._work_mode_options:
             if opt["label"] == option:
                 value = opt["value"]
                 break
@@ -64,7 +104,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
         success = await self.coordinator.client.async_device_control(
             self._entry.data["device_id"],
-            {"WORK_MODE_CMB": str(value)},
+            {self._signal: str(value)},
         )
-        if success:
+        if success is True:
             await self.coordinator.async_request_refresh()
