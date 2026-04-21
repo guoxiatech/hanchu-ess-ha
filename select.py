@@ -8,8 +8,17 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
+from .sensor import STATUS_MAP
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _is_device_online(coordinator) -> bool:
+    dev_status = coordinator.data.get("devStatus")
+    try:
+        return int(dev_status) == 1
+    except (ValueError, TypeError):
+        return False
 
 
 def _parse_work_mode_options(menu_data: dict) -> list:
@@ -57,6 +66,10 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
             manufacturer="Hanchuess",
             model="ESS Device",
         )
+
+    @property
+    def available(self) -> bool:
+        return super().available and _is_device_online(self.coordinator)
 
     @property
     def options(self) -> list[str]:

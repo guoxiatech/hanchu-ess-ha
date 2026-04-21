@@ -10,6 +10,14 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _is_device_online(coordinator) -> bool:
+    dev_status = coordinator.data.get("devStatus")
+    try:
+        return int(dev_status) == 1
+    except (ValueError, TypeError):
+        return False
+
 SWITCHES = {
     "inverter_switch": {
         "key": "inverterOn",
@@ -50,6 +58,10 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
             manufacturer="Hanchuess",
             model="ESS Device",
         )
+
+    @property
+    def available(self) -> bool:
+        return super().available and _is_device_online(self.coordinator)
 
     @property
     def is_on(self) -> bool | None:
