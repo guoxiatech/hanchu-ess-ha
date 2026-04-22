@@ -222,6 +222,10 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         language = self.hass.config.language or "en"
         sn = self._entry.data["sn"]
         menu_data = await self.coordinator.client.async_get_menu(sn, language)
+        _LOGGER.info("[HANCHUESS] menu raw itemTypes for %s: %s", sn,
+                     [(it.get("itemCode"), it.get("itemType"))
+                      for grp in (list(menu_data.get("data", {}).values())[0] or {}).get("items", [])
+                      for it in grp] if menu_data.get("data") else "no data")
         parsed = _parse_energy_menu(menu_data)
         if parsed["work_mode_options"]:
             self._work_mode_options = parsed["work_mode_options"]
