@@ -205,9 +205,10 @@ class HanchuessEnergyCard extends HTMLElement {
     }
 
     const fields = state.attributes.energy_fields || [];
-    this._renderDynamicFields(fields);
+    const reRendered = this._renderDynamicFields(fields);
 
     if (this._dataLoaded) {
+      if (reRendered) this._fillData(this._originalValues);
       this._toggleFields(select.value);
     }
   }
@@ -217,7 +218,7 @@ class HanchuessEnergyCard extends HTMLElement {
     if (!container) return;
     // Re-render if fields changed
     const fieldsKey = JSON.stringify(fields.map(f => f.code + f.type));
-    if (container.dataset.renderedKey === fieldsKey) return;
+    if (container.dataset.renderedKey === fieldsKey) return false;
     container.dataset.renderedKey = fieldsKey;
 
     let html = "";
@@ -298,6 +299,80 @@ class HanchuessEnergyCard extends HTMLElement {
         }
       }
     };
+    return true;
+  }
+
+  _fillData(result) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    if (!container) return;
+
+    // Fill data-signal inputs
+    container.querySelectorAll("input[data-signal]").forEach(input => {
+      const signal = input.dataset.signal;
+      if (signal && result[signal] !== undefined) {
+        if (input.type === "time") {
+          const v = String(result[signal]);
+          if (v.includes(":")) input.value = v;
+          else if (v.length <= 4) { const s = v.padStart(4, "0"); input.value = s.slice(0,2) + ":" + s.slice(2,4); }
+          else input.value = this._signalToTime(result[signal]);
+        } else if (input.type === "checkbox") {
+          input.checked = String(result[signal]) === (input.dataset.on || "1");
+        } else if (signal === "MIN_THRESH_CHG_DUR") {
+          input.value = Math.round(Number(result[signal]) / 60);
+        } else {
+          input.value = result[signal];
+        }
+      }
+    });
+    container.querySelectorAll("select[data-signal]").forEach(sel => {
+      const signal = sel.dataset.signal;
+      if (signal && result[signal] !== undefined) sel.value = String(result[signal]);
+    });
+
+    // Fill collapse array fields
+    container.querySelectorAll("[data-arr-signal]").forEach(el => {
+      const sig = el.dataset.arrSignal;
+      const idx = parseInt(el.dataset.arrIndex);
+      if (!sig || isNaN(idx) || result[sig] === undefined) return;
+      let arr;
+      try { arr = JSON.parse(result[sig]); } catch { return; }
+      if (!Array.isArray(arr) || idx >= arr.length) return;
+      const val = arr[idx];
+      if (el.type === "time" || el.dataset.arrFmt === "time") {
+        const s = String(val).padStart(4, "0");
+        el.value = s.slice(0,2) + ":" + s.slice(2,4);
+      } else if (el.tagName === "SELECT") {
+        el.value = String(val);
+      } else {
+        el.value = String(val).replace(/"/g, "");
+      }
+    });
+
+    // Fill FLAG_ENABLE_CYCLE switches
+    let enableCycle = [];
+    try { enableCycle = JSON.parse(result["FLAG_ENABLE_CYCLE"] || "[]"); } catch {}
+    container.querySelectorAll("[data-enable-signal]").forEach(sw => {
+      const code = sw.dataset.enableSignal;
+      const m = code.match(/TCT_(CHG|DISCHG)(\d)/);
+      if (m && enableCycle.length) {
+        const ci = m[1] === "CHG" ? Number(m[2]) : 3 + Number(m[2]);
+        sw.checked = enableCycle[ci] === 1;
+      }
+    });
+
+    // Expand/collapse based on switch
+    container.querySelectorAll("[data-collapse-switch]").forEach(sw => {
+      const code = sw.dataset.collapseSwitch;
+      const body = container.querySelector(`[data-body="${code}"]`);
+      const arrow = container.querySelector(`[data-arrow="${code}"]`);
+      if (sw.checked) {
+        if (body) body.classList.add("open");
+        if (arrow) arrow.classList.add("open");
+      } else {
+        if (body) body.classList.remove("open");
+        if (arrow) arrow.classList.remove("open");
+      }
+    });
   }
 
   _deleteTimeSlot(group, index) {
