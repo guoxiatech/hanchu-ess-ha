@@ -41,14 +41,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Auto register card resource (only once)
     if not hass.data[DOMAIN].get("_card_registered"):
-        # Log all lovelace related keys to find the right one
-        lovelace_keys = [k for k in hass.data.keys() if "lovelace" in str(k).lower()]
-        _LOGGER.warning("[HANCHUESS] lovelace keys in hass.data: %s", lovelace_keys)
-        for key in lovelace_keys:
-            val = hass.data[key]
-            _LOGGER.warning("[HANCHUESS] hass.data[%s] type=%s value=%s", key, type(val).__name__, str(val)[:200])
-
-        hass.data[DOMAIN]["_card_registered"] = True
+        try:
+            lovelace_data = hass.data.get("lovelace")
+            if lovelace_data and lovelace_data.resource_mode == "storage":
+                resources = lovelace_data.resources
+                existing = [r for r in resources.async_items() if "hanchuess-energy-card" in r.get("url", "")]
+                if not existing:
+                    await resources.async_create_item({
+                        "res_type": "module",
+                        "url": CARD_URL,
+                    })
+                    _LOGGER.info("[HANCHUESS] Card resource auto-registered")
+            hass.data[DOMAIN]["_card_registered"] = True
+        except Exception as err:
+            _LOGGER.warning("[HANCHUESS] Card resource auto-register failed: %s", err)
 
     client = HanchuessApiClient(
         domain=BASE_URL,
