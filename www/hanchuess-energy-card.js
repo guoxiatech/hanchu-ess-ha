@@ -265,7 +265,10 @@ class HanchuessEnergyCard extends HTMLElement {
       if (listenerCode === "work_mode") {
         const showValues = (listenerShow || "").split(",");
         if (showValues.includes(currentValue)) {
-          el.classList.add("visible");
+          // Don't show time fields that are all zeros
+          if (el.dataset.timeHidden !== "true") {
+            el.classList.add("visible");
+          }
         } else {
           el.classList.remove("visible");
         }
@@ -274,13 +277,19 @@ class HanchuessEnergyCard extends HTMLElement {
   }
 
   _signalToTime(val) {
-    // "1100" → "11:00", "0" → "00:00"
-    const s = String(val).padStart(4, "0");
-    return s.slice(0, 2) + ":" + s.slice(2, 4);
+    // seconds to "HH:mm", e.g. 3600 → "01:00", 21600 → "06:00"
+    const totalSeconds = Number(val) || 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
   }
 
   _timeToSignal(timeStr) {
-    return timeStr.replace(":", "");
+    // "HH:mm" to seconds, e.g. "01:00" → "3600", "06:00" → "21600"
+    const parts = timeStr.split(":");
+    const hours = Number(parts[0]) || 0;
+    const minutes = Number(parts[1]) || 0;
+    return String(hours * 3600 + minutes * 60);
   }
 
   async _loadData() {
@@ -348,6 +357,19 @@ class HanchuessEnergyCard extends HTMLElement {
           } else {
             input.value = result[signal];
           }
+        }
+      });
+
+      // Hide time range groups where both start and end are 0
+      const timeFields = container.querySelectorAll(".dynamic-field[data-signal*=',']");
+      timeFields.forEach(fieldEl => {
+        const timeInputs = fieldEl.querySelectorAll("input[type='time']");
+        const allZero = Array.from(timeInputs).every(inp => inp.value === "00:00");
+        if (allZero) {
+          fieldEl.classList.remove("visible");
+          fieldEl.dataset.timeHidden = "true";
+        } else {
+          delete fieldEl.dataset.timeHidden;
         }
       });
 
