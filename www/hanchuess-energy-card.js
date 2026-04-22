@@ -343,6 +343,8 @@ class HanchuessEnergyCard extends HTMLElement {
         if (signal && result[signal] !== undefined) {
           if (input.type === "time") {
             input.value = this._signalToTime(result[signal]);
+          } else if (signal === "MIN_THRESH_CHG_DUR") {
+            input.value = Math.round(Number(result[signal]) / 60);
           } else {
             input.value = result[signal];
           }
@@ -403,6 +405,8 @@ class HanchuessEnergyCard extends HTMLElement {
         let newVal;
         if (input.type === "time") {
           newVal = this._timeToSignal(input.value);
+        } else if (signal === "MIN_THRESH_CHG_DUR") {
+          newVal = String(Number(input.value) * 60);
         } else {
           newVal = input.value;
         }
