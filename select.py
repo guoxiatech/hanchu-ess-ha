@@ -20,21 +20,71 @@ def _is_device_online(coordinator) -> bool:
         return False
 
 
-def _parse_work_mode_options(menu_data: dict) -> list:
+def _parse_energy_menu(menu_data: dict) -> dict:
+    """Parse energy menu into structured data for card."""
+    result = {"work_mode_options": [], "fields": []}
+
     energy = menu_data.get("data", {}).get("energy", {})
     for group in energy.get("items", []):
         for item in group:
-            if item.get("itemCode") == "work_mode" and item.get("itemType") == "3":
+            item_type = item.get("itemType")
+            item_code = item.get("itemCode")
+            signal = item.get("itemCodeSignal", "")
+
+            # Work mode (select)
+            if item_code == "work_mode" and item_type == "3":
                 try:
                     options = json.loads(item.get("optVal", "[]"))
-                    return [
-                        {"label": opt["name"], "value": opt["value"],
-                         "signal": item.get("itemCodeSignal", "WORK_MODE_CMB")}
+                    result["work_mode_options"] = [
+                        {"label": opt["name"], "value": opt["value"], "signal": signal}
                         for opt in options
                     ]
                 except (json.JSONDecodeError, KeyError):
                     _LOGGER.error("Failed to parse work mode options")
-    return []
+                continue
+
+            # Build field info
+            field = {
+                "code": item_code,
+                "signal": signal,
+                "type": item_type,
+                "name": item.get("itemName", ""),
+            }
+
+            # Number input (type=1)
+            if item_type == "1":
+                field["min"] = item.get("minVal", "")
+                field["max"] = item.get("maxVal", "")
+
+            # Select (type=3)
+            if item_type == "3":
+                try:
+                    field["options"] = json.loads(item.get("optVal", "[]"))
+                except (json.JSONDecodeError, KeyError):
+                    field["options"] = []
+
+            # Switch (type=4)
+            if item_type == "4":
+                field["onVal"] = item.get("onVal")
+                field["offVal"] = item.get("offVal")
+
+            # Time range (type=6)
+            if item_type == "6":
+                field["format"] = item.get("defFmt", "HH:mm")
+
+            # Listener (show/hide based on work mode)
+            listener = item.get("listener")
+            if listener:
+                field["listener_code"] = listener.get("code", "")
+                field["listener_show"] = listener.get("show", "")
+
+            # Hidden by default
+            if item.get("hidden"):
+                field["hidden"] = True
+
+            result["fields"].append(field)
+
+    return result
 
 
 async def async_setup_entry(
@@ -55,6 +105,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.data['sn']}_work_mode"
         self._work_mode_options = []
+        self._energy_fields = []
         self._signal = "WORK_MODE_CMB"
         self._menu_loaded = False
 
@@ -69,7 +120,11 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def extra_state_attributes(self):
-        return {"sn": self._entry.data["sn"]}
+        return {
+            "sn": self._entry.data["sn"],
+            "energy_fields": self._energy_fields,
+            "work_mode_options": self._work_mode_options,
+        }
 
     @property
     def available(self) -> bool:
@@ -93,12 +148,10 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         return None
 
     async def async_added_to_hass(self) -> None:
-        """Called when entity is added to HA. Fetch menu on first load."""
         await super().async_added_to_hass()
         await self._refresh_menu()
 
     async def async_update(self) -> None:
-        """Called every time HA UI requests entity state."""
         if not self._menu_loaded:
             await self._refresh_menu()
         await super().async_update()
@@ -107,10 +160,11 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         language = self.hass.config.language or "en"
         sn = self._entry.data["sn"]
         menu_data = await self.coordinator.client.async_get_menu(sn, language)
-        options = _parse_work_mode_options(menu_data)
-        if options:
-            self._work_mode_options = options
-            self._signal = options[0].get("signal", "WORK_MODE_CMB")
+        parsed = _parse_energy_menu(menu_data)
+        if parsed["work_mode_options"]:
+            self._work_mode_options = parsed["work_mode_options"]
+            self._signal = parsed["work_mode_options"][0].get("signal", "WORK_MODE_CMB")
+            self._energy_fields = parsed["fields"]
             self._menu_loaded = True
 
     async def async_select_option(self, option: str) -> None:

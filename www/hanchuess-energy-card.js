@@ -98,8 +98,8 @@ class HanchuessEnergyCard extends HTMLElement {
         .time-group { display: flex; align-items: center; gap: 8px; }
         .time-group input { flex: 1; }
         .time-group span { color: var(--secondary-text-color); }
-        .tou-fields { display: none; }
-        .tou-fields.visible { display: block; }
+        .dynamic-field { display: none; }
+        .dynamic-field.visible { display: block; }
         .section-title { font-size: 14px; font-weight: 500; margin: 16px 0 8px; color: var(--primary-color); }
         .submit-btn {
           width: 100%; padding: 10px; margin-top: 16px; border: none; border-radius: 4px;
@@ -120,35 +120,7 @@ class HanchuessEnergyCard extends HTMLElement {
           <select id="work_mode"></select>
         </div>
 
-        <div id="tou_fields" class="tou-fields">
-          <div class="section-title">充电时间段 1</div>
-          <div class="field">
-            <div class="time-group">
-              <input type="time" id="chg_start_1" value="00:00">
-              <span>—</span>
-              <input type="time" id="chg_end_1" value="00:00">
-            </div>
-          </div>
-
-          <div class="section-title">放电时间段 1</div>
-          <div class="field">
-            <div class="time-group">
-              <input type="time" id="dschg_start_1" value="00:00">
-              <span>—</span>
-              <input type="time" id="dschg_end_1" value="00:00">
-            </div>
-          </div>
-
-          <div class="field">
-            <label>充电功率限值（W）</label>
-            <input type="number" id="chg_pwr_lmt" min="0" max="8000" value="0">
-          </div>
-
-          <div class="field">
-            <label>放电功率限值（W）</label>
-            <input type="number" id="dschg_pwr_lmt" min="0" max="8000" value="0">
-          </div>
-        </div>
+        <div id="dynamic_fields"></div>
 
         <button class="submit-btn" id="submit_btn">提交</button>
         <div class="status" id="status_msg"></div>
@@ -156,7 +128,7 @@ class HanchuessEnergyCard extends HTMLElement {
     `;
 
     this.shadowRoot.getElementById("work_mode").addEventListener("change", (e) => {
-      this._toggleTouFields(e.target.value);
+      this._toggleFields(e.target.value);
     });
 
     this.shadowRoot.getElementById("submit_btn").addEventListener("click", () => {
@@ -170,11 +142,9 @@ class HanchuessEnergyCard extends HTMLElement {
     const state = this._hass.states[this._config.entity];
     if (!state) return;
 
-    // Show device SN
     const snEl = this.shadowRoot.getElementById("device_sn");
     if (snEl) snEl.textContent = this._config.sn || "";
 
-    // Check online status
     const isOnline = state.state !== "unavailable";
     const offlineBanner = this.shadowRoot.getElementById("offline_banner");
     const submitBtn = this.shadowRoot.getElementById("submit_btn");
@@ -197,14 +167,94 @@ class HanchuessEnergyCard extends HTMLElement {
       select.value = current;
     }
 
-    this._toggleTouFields(current);
+    const fields = state.attributes.energy_fields || [];
+    this._renderDynamicFields(fields);
+    this._toggleFields(current);
   }
 
-  _toggleTouFields(mode) {
-    const touFields = this.shadowRoot.getElementById("tou_fields");
-    if (!touFields) return;
-    const isTou = mode === "分时充放" || mode === "Time of Use" || mode === "TOU";
-    touFields.classList.toggle("visible", isTou);
+  _renderDynamicFields(fields) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    if (!container || container.dataset.rendered === "true") return;
+
+    let html = "";
+    for (const field of fields) {
+      const listenerAttr = field.listener_code
+        ? `data-listener-code="${field.listener_code}" data-listener-show="${field.listener_show}"`
+        : "";
+      const hiddenClass = field.hidden || field.listener_code ? "dynamic-field" : "dynamic-field visible";
+
+      if (field.type === "1") {
+        const min = field.min || "0";
+        const max = field.max || "99999";
+        html += `
+          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}">
+            <div class="field">
+              <label>${field.name}</label>
+              <input type="number" data-signal="${field.signal}" min="${min}" max="${max}" value="${min}">
+            </div>
+          </div>
+        `;
+      }
+
+      if (field.type === "6") {
+        const signals = (field.signal || "").split(",");
+        const startSignal = signals[0] || "";
+        const endSignal = signals[1] || "";
+        html += `
+          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}">
+            <div class="section-title">${field.name}</div>
+            <div class="field">
+              <div class="time-group">
+                <input type="time" data-signal="${startSignal}" value="00:00">
+                <span>—</span>
+                <input type="time" data-signal="${endSignal}" value="00:00">
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    container.innerHTML = html;
+    container.dataset.rendered = "true";
+  }
+
+  _toggleFields(currentWorkModeLabel) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    if (!container) return;
+
+    const state = this._hass.states[this._config.entity];
+    if (!state) return;
+
+    // Get current work mode numeric value from work_mode_options
+    const wmOptions = state.attributes.work_mode_options || [];
+    let currentValue = "";
+    for (const opt of wmOptions) {
+      if (opt.label === currentWorkModeLabel) {
+        currentValue = String(opt.value);
+        break;
+      }
+    }
+
+    const allFields = this.shadowRoot.querySelectorAll(".dynamic-field");
+    allFields.forEach(el => {
+      const listenerCode = el.dataset.listenerCode;
+      const listenerShow = el.dataset.listenerShow;
+
+      if (!listenerCode) {
+        el.classList.add("visible");
+        return;
+      }
+
+      if (listenerCode === "work_mode") {
+        const showValues = (listenerShow || "").split(",");
+        if (showValues.includes(currentValue)) {
+          el.classList.add("visible");
+        } else {
+          el.classList.remove("visible");
+        }
+      }
+    });
   }
 
   _timeToSignal(timeStr) {
@@ -220,28 +270,49 @@ class HanchuessEnergyCard extends HTMLElement {
 
     const entityId = this._config.entity;
     const sn = this._config.sn;
-    const workMode = this.shadowRoot.getElementById("work_mode").value;
+    const workModeLabel = this.shadowRoot.getElementById("work_mode").value;
+
+    const state = this._hass.states[entityId];
+    if (!state) return;
+
+    // Find work mode signal and value
+    const wmOptions = state.attributes.work_mode_options || [];
+    let wmSignal = "WORK_MODE_CMB";
+    let wmValue = "";
+    for (const opt of wmOptions) {
+      if (opt.label === workModeLabel) {
+        wmValue = String(opt.value);
+        wmSignal = opt.signal || "WORK_MODE_CMB";
+        break;
+      }
+    }
 
     try {
-      await this._hass.callService("select", "select_option", {
-        entity_id: entityId,
-        option: workMode,
+      // Build valueMap with work mode + all visible fields
+      const valueMap = {};
+      valueMap[wmSignal] = wmValue;
+
+      const container = this.shadowRoot.getElementById("dynamic_fields");
+      const visibleFields = container.querySelectorAll(".dynamic-field.visible");
+
+      visibleFields.forEach(fieldEl => {
+        const inputs = fieldEl.querySelectorAll("input");
+        inputs.forEach(input => {
+          const signal = input.dataset.signal;
+          if (signal) {
+            if (input.type === "time") {
+              valueMap[signal] = this._timeToSignal(input.value);
+            } else {
+              valueMap[signal] = input.value;
+            }
+          }
+        });
       });
 
-      const isTou = workMode === "分时充放" || workMode === "Time of Use" || workMode === "TOU";
-      if (isTou) {
-        await this._hass.callService("hanchuess", "device_control", {
-          sn: sn,
-          value_map: {
-            "TCT_START_1": this._timeToSignal(this.shadowRoot.getElementById("chg_start_1").value),
-            "TCT_END_1": this._timeToSignal(this.shadowRoot.getElementById("chg_end_1").value),
-            "TDT_START_1": this._timeToSignal(this.shadowRoot.getElementById("dschg_start_1").value),
-            "TDT_END_1": this._timeToSignal(this.shadowRoot.getElementById("dschg_end_1").value),
-            "CHG_PWR_LMT": this.shadowRoot.getElementById("chg_pwr_lmt").value,
-            "DSCHG_PWR_LMT": this.shadowRoot.getElementById("dschg_pwr_lmt").value,
-          },
-        });
-      }
+      await this._hass.callService("hanchuess", "device_control", {
+        sn: sn,
+        value_map: valueMap,
+      });
 
       statusMsg.textContent = "提交成功";
       statusMsg.className = "status success";
