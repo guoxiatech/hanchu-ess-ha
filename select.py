@@ -61,6 +61,9 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                 "name": item.get("itemName", ""),
             }
 
+            # Listener (show/hide based on work mode)
+            listener = item.get("listener")
+
             # Number input (type=1)
             if item_type == "1":
                 field["min"] = item.get("minVal", "")
@@ -83,8 +86,8 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                 field["format"] = item.get("defFmt", "HH:mm")
 
             # Collapsible time period (type=82/83)
+            # Auto-expand to 3 slots: signal0, signal1, signal2
             # Signal value is JSON array: [type, charge_mode, "power", "startTime", "endTime"]
-            # or for discharge (83): [type, 0, "power", "startTime", "endTime"]
             if item_type in ("82", "83"):
                 idx_map = {"charge_mode": 1, "chg_pwr_lmt": 2, "start_time": 3, "end_time": 4}
                 children = []
@@ -93,7 +96,7 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                     ct = child.get("itemType", "")
                     c = {
                         "code": code,
-                        "type": ct,
+                        "type": ct if ct not in ("5", "6") else "5",
                         "name": child.get("itemName", ""),
                         "index": idx_map.get(code, 0),
                     }
@@ -111,13 +114,28 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                             c["options"] = json.loads(child.get("optVal", "[]"))
                         except (json.JSONDecodeError, KeyError):
                             c["options"] = []
-                    if ct in ("5", "6"):
-                        c["type"] = "5"
                     children.append(c)
-                field["children"] = children
 
-            # Listener (show/hide based on work mode)
-            listener = item.get("listener")
+                # Expand to 3 slots
+                base_code = item_code.rstrip("0123456789")  # TCT_CHG0 -> TCT_CHG
+                base_name = field["name"].rstrip("0123456789").rstrip()  # "充电时间段1" -> "充电时间段"
+                for i in range(3):
+                    slot = {
+                        "code": f"{base_code}{i}",
+                        "signal": f"{signal}{i}" if not signal[-1].isdigit() else f"{signal[:-1]}{i}",
+                        "type": item_type,
+                        "name": f"{base_name}{i + 1}",
+                        "children": children,
+                    }
+                    if listener:
+                        slot["listener_code"] = listener.get("code", "")
+                        slot["listener_show"] = listener.get("show", "")
+                    if item.get("hidden"):
+                        slot["hidden"] = True
+                    result["fields"].append(slot)
+                continue
+
+            # Listener for non-collapse fields
             if listener:
                 field["listener_code"] = listener.get("code", "")
                 field["listener_show"] = listener.get("show", "")
