@@ -108,9 +108,17 @@ class HanchuessEnergyCard extends HTMLElement {
           color: var(--primary-text-color); font-size: 14px; box-sizing: border-box;
         }
         .field input::placeholder { color: var(--secondary-text-color); opacity: 0.6; }
-        .time-group { display: flex; align-items: center; gap: 8px; }
-        .time-group input { flex: 1; }
-        .time-group span { color: var(--secondary-text-color); }
+        .time-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .time-row input { flex: 1; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); font-size: 14px; }
+        .time-row span { color: var(--secondary-text-color); }
+        .time-row .time-label { font-size: 13px; color: var(--secondary-text-color); min-width: 80px; }
+        .icon-btn {
+          background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px;
+          color: var(--secondary-text-color); line-height: 1;
+        }
+        .icon-btn:hover { color: var(--primary-text-color); }
+        .icon-btn.add { color: var(--primary-color); font-size: 20px; }
+        .icon-btn.del { color: var(--error-color, #db4437); }
         .dynamic-field { display: none; }
         .dynamic-field.visible { display: block; }
         .section-title { font-size: 14px; font-weight: 500; margin: 16px 0 8px; color: var(--primary-color); }
@@ -169,7 +177,6 @@ class HanchuessEnergyCard extends HTMLElement {
     if (submitBtn) submitBtn.disabled = !isOnline;
     if (loadBtn) loadBtn.disabled = !isOnline;
 
-    // Populate work mode options (without selecting value)
     const select = this.shadowRoot.getElementById("work_mode");
     if (!select) return;
 
@@ -179,11 +186,9 @@ class HanchuessEnergyCard extends HTMLElement {
         options.map(opt => `<option value="${opt}">${opt}</option>`).join("");
     }
 
-    // Render dynamic fields
     const fields = state.attributes.energy_fields || [];
     this._renderDynamicFields(fields);
 
-    // If data loaded, keep current values and toggle
     if (this._dataLoaded) {
       this._toggleFields(select.value);
     }
@@ -194,6 +199,9 @@ class HanchuessEnergyCard extends HTMLElement {
     if (!container || container.dataset.rendered === "true") return;
 
     let html = "";
+    // Group time fields by type (chg/dschg) and index (1/2/3)
+    const timeGroups = {}; // { "chg": [{field, index}], "dschg": [{field, index}] }
+
     for (const field of fields) {
       const listenerAttr = field.listener_code
         ? `data-listener-code="${field.listener_code}" data-listener-show="${field.listener_show}"`
@@ -217,15 +225,23 @@ class HanchuessEnergyCard extends HTMLElement {
         const signals = (field.signal || "").split(",");
         const startSignal = signals[0] || "";
         const endSignal = signals[1] || "";
+        // Determine group: chg_tim_range_X or dschg_tim_range_X
+        const code = field.code || "";
+        const isChg = code.startsWith("chg_tim");
+        const isDschg = code.startsWith("dschg_tim");
+        const match = code.match(/(\d)$/);
+        const index = match ? match[1] : "1";
+        const groupKey = isChg ? "chg" : isDschg ? "dschg" : code;
+
         html += `
-          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}">
-            <div class="section-title">${field.name}</div>
-            <div class="field">
-              <div class="time-group">
-                <input type="time" data-signal="${startSignal}" value="">
-                <span>—</span>
-                <input type="time" data-signal="${endSignal}" value="">
-              </div>
+          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}" data-time-group="${groupKey}" data-time-index="${index}">
+            <div class="time-row">
+              <span class="time-label">${field.name}</span>
+              <input type="time" data-signal="${startSignal}" placeholder="开始时间">
+              <span>-</span>
+              <input type="time" data-signal="${endSignal}" placeholder="结束时间">
+              <button class="icon-btn del" data-action="del-time" data-group="${groupKey}" data-index="${index}" title="删除">🗑</button>
+              <button class="icon-btn add" data-action="add-time" data-group="${groupKey}" data-index="${index}" title="添加" style="display:none">+</button>
             </div>
           </div>
         `;
@@ -234,6 +250,123 @@ class HanchuessEnergyCard extends HTMLElement {
 
     container.innerHTML = html;
     container.dataset.rendered = "true";
+
+    // Bind time add/delete events
+    container.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const group = btn.dataset.group;
+      const index = btn.dataset.index;
+
+      if (action === "del-time") {
+        this._deleteTimeSlot(group, index);
+      } else if (action === "add-time") {
+        this._addTimeSlot(group, index);
+      }
+    });
+  }
+
+  _deleteTimeSlot(group, index) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    const allSlots = Array.from(container.querySelectorAll(`[data-time-group="${group}"]`));
+    
+    // Collect all visible slots' values
+    const visibleValues = [];
+    allSlots.forEach(slot => {
+      if (slot.classList.contains("visible") && slot.dataset.timeHidden !== "true") {
+        const inputs = slot.querySelectorAll("input[type='time']");
+        visibleValues.push({
+          start: inputs[0] ? inputs[0].value : "",
+          end: inputs[1] ? inputs[1].value : "",
+        });
+      }
+    });
+
+    // Remove the deleted index (0-based from visible list)
+    const delIdx = parseInt(index) - 1;
+    // Find which visible slot corresponds to this index
+    let visibleIdx = 0;
+    for (let i = 0; i < allSlots.length; i++) {
+      if (allSlots[i].dataset.timeIndex === index && allSlots[i].classList.contains("visible")) {
+        // Find position in visible list
+        visibleIdx = 0;
+        for (let j = 0; j < i; j++) {
+          if (allSlots[j].classList.contains("visible") && allSlots[j].dataset.timeHidden !== "true") {
+            visibleIdx++;
+          }
+        }
+        break;
+      }
+    }
+    visibleValues.splice(visibleIdx, 1);
+
+    // Redistribute values to slots 1, 2, 3
+    allSlots.forEach((slot, i) => {
+      const inputs = slot.querySelectorAll("input[type='time']");
+      if (i < visibleValues.length) {
+        inputs[0].value = visibleValues[i].start;
+        inputs[1].value = visibleValues[i].end;
+        slot.classList.add("visible");
+        delete slot.dataset.timeHidden;
+      } else {
+        inputs[0].value = "00:00";
+        inputs[1].value = "00:00";
+        slot.classList.remove("visible");
+        slot.dataset.timeHidden = "true";
+      }
+    });
+
+    this._updateTimeButtons(group);
+  }
+
+  _addTimeSlot(group, index) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    // Find next hidden time slot in this group
+    const allSlots = container.querySelectorAll(`[data-time-group="${group}"]`);
+    for (const slot of allSlots) {
+      if (slot.dataset.timeHidden === "true" || !slot.classList.contains("visible")) {
+        slot.classList.add("visible");
+        delete slot.dataset.timeHidden;
+        // Clear values for new slot
+        const inputs = slot.querySelectorAll("input[type='time']");
+        inputs.forEach(inp => { inp.value = ""; });
+        break;
+      }
+    }
+
+    this._updateTimeButtons(group);
+  }
+
+  _updateTimeButtons(group) {
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    const allSlots = container.querySelectorAll(`[data-time-group="${group}"]`);
+
+    // Find visible slots
+    const visibleSlots = [];
+    const hiddenSlots = [];
+    allSlots.forEach(slot => {
+      if (slot.classList.contains("visible") && slot.dataset.timeHidden !== "true") {
+        visibleSlots.push(slot);
+      } else {
+        hiddenSlots.push(slot);
+      }
+    });
+
+    // Hide all add buttons, show all delete buttons
+    allSlots.forEach(slot => {
+      const addBtn = slot.querySelector("[data-action='add-time']");
+      const delBtn = slot.querySelector("[data-action='del-time']");
+      if (addBtn) addBtn.style.display = "none";
+      if (delBtn) delBtn.style.display = "";
+    });
+
+    // Show add button on last visible slot if there are hidden slots available
+    if (visibleSlots.length > 0 && hiddenSlots.length > 0) {
+      const lastVisible = visibleSlots[visibleSlots.length - 1];
+      const addBtn = lastVisible.querySelector("[data-action='add-time']");
+      if (addBtn) addBtn.style.display = "";
+    }
   }
 
   _toggleFields(currentWorkModeLabel) {
@@ -265,7 +398,6 @@ class HanchuessEnergyCard extends HTMLElement {
       if (listenerCode === "work_mode") {
         const showValues = (listenerShow || "").split(",");
         if (showValues.includes(currentValue)) {
-          // Don't show time fields that are all zeros
           if (el.dataset.timeHidden !== "true") {
             el.classList.add("visible");
           }
@@ -274,10 +406,16 @@ class HanchuessEnergyCard extends HTMLElement {
         }
       }
     });
+
+    // Update add/delete buttons for time groups
+    const groups = new Set();
+    container.querySelectorAll("[data-time-group]").forEach(el => {
+      groups.add(el.dataset.timeGroup);
+    });
+    groups.forEach(g => this._updateTimeButtons(g));
   }
 
   _signalToTime(val) {
-    // seconds to "HH:mm", e.g. 3600 → "01:00", 21600 → "06:00"
     const totalSeconds = Number(val) || 0;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -285,7 +423,6 @@ class HanchuessEnergyCard extends HTMLElement {
   }
 
   _timeToSignal(timeStr) {
-    // "HH:mm" to seconds, e.g. "01:00" → "3600", "06:00" → "21600"
     const parts = timeStr.split(":");
     const hours = Number(parts[0]) || 0;
     const minutes = Number(parts[1]) || 0;
@@ -302,7 +439,6 @@ class HanchuessEnergyCard extends HTMLElement {
     const state = this._hass.states[this._config.entity];
     if (!state) return;
 
-    // Collect all signal keys from dynamic fields
     const keys = [];
     const fields = state.attributes.energy_fields || [];
     for (const field of fields) {
@@ -312,7 +448,6 @@ class HanchuessEnergyCard extends HTMLElement {
       }
     }
 
-    // Add work mode signal
     const wmOptions = state.attributes.work_mode_options || [];
     if (wmOptions.length > 0) {
       keys.push(wmOptions[0].signal || "WORK_MODE_CMB");
@@ -326,7 +461,6 @@ class HanchuessEnergyCard extends HTMLElement {
         keys: keys,
       });
 
-      // Store original values for change detection
       this._originalValues = { ...result };
       this._dataLoaded = true;
 
@@ -338,7 +472,6 @@ class HanchuessEnergyCard extends HTMLElement {
         for (const opt of wmOptions) {
           if (String(opt.value) === String(wmValue)) {
             select.value = opt.label;
-            this._toggleFields(opt.label);
             break;
           }
         }
@@ -360,18 +493,22 @@ class HanchuessEnergyCard extends HTMLElement {
         }
       });
 
-      // Hide time range groups where both start and end are 0
-      const timeFields = container.querySelectorAll(".dynamic-field[data-signal*=',']");
-      timeFields.forEach(fieldEl => {
-        const timeInputs = fieldEl.querySelectorAll("input[type='time']");
+      // Handle time slot visibility
+      const timeSlots = container.querySelectorAll("[data-time-group]");
+      timeSlots.forEach(slot => {
+        const timeInputs = slot.querySelectorAll("input[type='time']");
         const allZero = Array.from(timeInputs).every(inp => inp.value === "00:00");
         if (allZero) {
-          fieldEl.classList.remove("visible");
-          fieldEl.dataset.timeHidden = "true";
+          slot.classList.remove("visible");
+          slot.dataset.timeHidden = "true";
         } else {
-          delete fieldEl.dataset.timeHidden;
+          delete slot.dataset.timeHidden;
         }
       });
+
+      // Toggle fields based on work mode and update buttons
+      const select = this.shadowRoot.getElementById("work_mode");
+      this._toggleFields(select.value);
 
       statusMsg.textContent = "数据加载成功";
       statusMsg.className = "status success";
@@ -418,6 +555,9 @@ class HanchuessEnergyCard extends HTMLElement {
     // Check visible field changes
     const container = this.shadowRoot.getElementById("dynamic_fields");
     const visibleFields = container.querySelectorAll(".dynamic-field.visible");
+    const changedSignals = new Set();
+
+    // First pass: find changed signals
     visibleFields.forEach(fieldEl => {
       const inputs = fieldEl.querySelectorAll("input");
       inputs.forEach(input => {
@@ -426,7 +566,7 @@ class HanchuessEnergyCard extends HTMLElement {
 
         let newVal;
         if (input.type === "time") {
-          newVal = this._timeToSignal(input.value);
+          newVal = this._timeToSignal(input.value || "00:00");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           newVal = String(Number(input.value) * 60);
         } else {
@@ -435,9 +575,62 @@ class HanchuessEnergyCard extends HTMLElement {
 
         const origVal = String(this._originalValues[signal] || "");
         if (newVal !== origVal) {
-          valueMap[signal] = newVal;
+          changedSignals.add(signal);
         }
       });
+    });
+
+    // Also check deleted time slots (hidden but were visible before)
+    const allTimeSlots = container.querySelectorAll("[data-time-group]");
+    allTimeSlots.forEach(slot => {
+      if (slot.dataset.timeHidden === "true") {
+        const inputs = slot.querySelectorAll("input[type='time']");
+        inputs.forEach(input => {
+          const signal = input.dataset.signal;
+          if (signal && this._originalValues[signal] && String(this._originalValues[signal]) !== "0") {
+            changedSignals.add(signal);
+          }
+        });
+      }
+    });
+
+    // Second pass: collect values, pair time fields together
+    visibleFields.forEach(fieldEl => {
+      const inputs = fieldEl.querySelectorAll("input");
+      const fieldSignals = Array.from(inputs).map(i => i.dataset.signal).filter(Boolean);
+
+      const hasChange = fieldSignals.some(s => changedSignals.has(s));
+      if (!hasChange) return;
+
+      inputs.forEach(input => {
+        const signal = input.dataset.signal;
+        if (!signal) return;
+
+        if (input.type === "time") {
+          valueMap[signal] = this._timeToSignal(input.value || "00:00");
+        } else if (signal === "MIN_THRESH_CHG_DUR") {
+          valueMap[signal] = String(Number(input.value) * 60);
+        } else {
+          valueMap[signal] = input.value;
+        }
+      });
+    });
+
+    // Collect deleted time slots (send 0)
+    allTimeSlots.forEach(slot => {
+      if (slot.dataset.timeHidden === "true") {
+        const inputs = slot.querySelectorAll("input[type='time']");
+        const hasOrig = Array.from(inputs).some(inp => {
+          const sig = inp.dataset.signal;
+          return sig && this._originalValues[sig] && String(this._originalValues[sig]) !== "0";
+        });
+        if (hasOrig) {
+          inputs.forEach(inp => {
+            const sig = inp.dataset.signal;
+            if (sig) valueMap[sig] = "0";
+          });
+        }
+      }
     });
 
     if (Object.keys(valueMap).length === 0) {
@@ -449,14 +642,13 @@ class HanchuessEnergyCard extends HTMLElement {
     }
 
     try {
-      const result = await this._hass.callWS({
+      await this._hass.callWS({
         type: "hanchuess/iot_set",
         sn: sn,
         dev_type: "2",
         value: valueMap,
       });
 
-      // Update original values
       Object.assign(this._originalValues, valueMap);
 
       statusMsg.textContent = "设定成功";
