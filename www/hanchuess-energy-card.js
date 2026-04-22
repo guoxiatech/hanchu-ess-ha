@@ -342,7 +342,6 @@ class HanchuessEnergyCard extends HTMLElement {
     const container = this.shadowRoot.getElementById("dynamic_fields");
     const allSlots = container.querySelectorAll(`[data-time-group="${group}"]`);
 
-    // Find visible slots
     const visibleSlots = [];
     const hiddenSlots = [];
     allSlots.forEach(slot => {
@@ -353,7 +352,6 @@ class HanchuessEnergyCard extends HTMLElement {
       }
     });
 
-    // Hide all add buttons, show all delete buttons
     allSlots.forEach(slot => {
       const addBtn = slot.querySelector("[data-action='add-time']");
       const delBtn = slot.querySelector("[data-action='del-time']");
@@ -361,7 +359,15 @@ class HanchuessEnergyCard extends HTMLElement {
       if (delBtn) delBtn.style.display = "";
     });
 
-    // Show add button on last visible slot if there are hidden slots available
+    // Only 1 visible: hide its delete button
+    if (visibleSlots.length <= 1) {
+      visibleSlots.forEach(slot => {
+        const delBtn = slot.querySelector("[data-action='del-time']");
+        if (delBtn) delBtn.style.display = "none";
+      });
+    }
+
+    // Show add button on last visible slot if there are hidden slots
     if (visibleSlots.length > 0 && hiddenSlots.length > 0) {
       const lastVisible = visibleSlots[visibleSlots.length - 1];
       const addBtn = lastVisible.querySelector("[data-action='add-time']");
