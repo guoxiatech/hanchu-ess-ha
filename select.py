@@ -118,7 +118,7 @@ def _parse_energy_menu(menu_data: dict) -> dict:
 
                 # Expand to 3 slots
                 base_code = item_code.rstrip("0123456789")  # TCT_CHG0 -> TCT_CHG
-                base_name = field["name"].rstrip("0123456789").rstrip()  # "充电时间段1" -> "充电时间段"
+                base_name = field["name"].rstrip("0123456789").rstrip()
                 for i in range(3):
                     slot = {
                         "code": f"{base_code}{i}",

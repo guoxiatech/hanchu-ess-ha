@@ -214,7 +214,11 @@ class HanchuessEnergyCard extends HTMLElement {
 
   _renderDynamicFields(fields) {
     const container = this.shadowRoot.getElementById("dynamic_fields");
-    if (!container || container.dataset.rendered === "true") return;
+    if (!container) return;
+    // Re-render if fields changed
+    const fieldsKey = JSON.stringify(fields.map(f => f.code + f.type));
+    if (container.dataset.renderedKey === fieldsKey) return;
+    container.dataset.renderedKey = fieldsKey;
 
     let html = "";
     for (const field of fields) {
@@ -260,9 +264,8 @@ class HanchuessEnergyCard extends HTMLElement {
     }
 
     container.innerHTML = html;
-    container.dataset.rendered = "true";
 
-    container.addEventListener("click", (e) => {
+    container.onclick = (e) => {
       const btn = e.target.closest("[data-action]");
       if (btn) {
         const {action, group, index} = btn.dataset;
@@ -278,9 +281,9 @@ class HanchuessEnergyCard extends HTMLElement {
         if (body) body.classList.toggle("open");
         if (arrow) arrow.classList.toggle("open");
       }
-    });
+    };
 
-    container.addEventListener("change", (e) => {
+    container.onchange = (e) => {
       const sw = e.target.closest("[data-collapse-switch]");
       if (sw) {
         const code = sw.dataset.collapseSwitch;
@@ -294,7 +297,7 @@ class HanchuessEnergyCard extends HTMLElement {
           if (arrow) arrow.classList.remove("open");
         }
       }
-    });
+    };
   }
 
   _deleteTimeSlot(group, index) {
