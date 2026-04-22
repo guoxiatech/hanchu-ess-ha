@@ -219,7 +219,6 @@ class HanchuessEnergyCard extends HTMLElement {
     const fieldsKey = JSON.stringify(fields.map(f => f.code + f.type));
     if (container.dataset.renderedKey === fieldsKey) return;
     container.dataset.renderedKey = fieldsKey;
-    console.log("[HANCHUESS] renderDynamicFields", fields.length, "fields", fields.map(f => f.code + ":" + f.type));
 
     let html = "";
     for (const field of fields) {
