@@ -47,7 +47,7 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._config = config
         self._attr_translation_key = switch_key
-        self._attr_unique_id = f"{entry.entry_id}_{switch_key}"
+        self._attr_unique_id = f"{entry.data['device_id']}_{switch_key}"
         self._attr_icon = config.get("icon")
 
     @property

@@ -88,7 +88,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=f"Hanchuess {sn}",
                     data={
-                        "device_id": sn,
+                        "sn": sn,
                         "dev_type": dev_type,
                         "token": self._token,
                         "pending_devices": pending,
@@ -98,7 +98,7 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Filter inverters and exclude already configured
         configured_ids = set()
         for entry in self.hass.config_entries.async_entries(DOMAIN):
-            configured_ids.add(entry.data.get("device_id"))
+            configured_ids.add(entry.data.get("sn"))
 
         available = {
             d["sn"]: d["sn"]
@@ -119,13 +119,13 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, data: dict):
         """Handle creation of additional devices from pending list."""
-        sn = data["device_id"]
+        sn = data["sn"]
         await self.async_set_unique_id(sn)
         self._abort_if_unique_id_configured()
         return self.async_create_entry(
             title=f"Hanchuess {sn}",
             data={
-                "device_id": sn,
+                "sn": sn,
                 "dev_type": data.get("dev_type", "2"),
                 "token": data["token"],
                 "pending_devices": [],

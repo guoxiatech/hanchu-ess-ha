@@ -26,18 +26,18 @@ class HanchuessRealtimeCoordinator(DataUpdateCoordinator):
         self.client = client
 
     async def _async_update_data(self) -> dict:
-        device_id = self.entry.data["device_id"]
+        sn = self.entry.data["sn"]
         language = self.hass.config.language or "en"
 
         if self.client.should_refresh_token():
             await self.client.async_refresh_token()
 
-        data = await self.client.async_get_device_status(device_id, language)
+        data = await self.client.async_get_device_status(sn, language)
 
         if data and data.get("_token_expired"):
             new_token = await self.client.async_refresh_token()
             if new_token:
-                data = await self.client.async_get_device_status(device_id, language)
+                data = await self.client.async_get_device_status(sn, language)
 
         if not data or data.get("_token_expired"):
             raise UpdateFailed("Failed to get device status")
@@ -58,15 +58,15 @@ class HanchuessStatisticsCoordinator(DataUpdateCoordinator):
         self.client = client
 
     async def _async_update_data(self) -> dict:
-        device_id = self.entry.data["device_id"]
+        sn = self.entry.data["sn"]
         language = self.hass.config.language or "en"
 
-        data = await self.client.async_get_device_statistics(device_id, language)
+        data = await self.client.async_get_device_statistics(sn, language)
 
         if data and data.get("_token_expired"):
             new_token = await self.client.async_refresh_token()
             if new_token:
-                data = await self.client.async_get_device_statistics(device_id, language)
+                data = await self.client.async_get_device_statistics(sn, language)
 
         if not data or data.get("_token_expired"):
             raise UpdateFailed("Failed to get device statistics")

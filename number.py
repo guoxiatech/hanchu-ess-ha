@@ -70,7 +70,7 @@ class HanchueNumber(CoordinatorEntity, NumberEntity):
         self._entry = entry
         self._config = config
         self._attr_translation_key = number_key
-        self._attr_unique_id = f"{entry.entry_id}_{number_key}"
+        self._attr_unique_id = f"{entry.data['sn']}_{number_key}"
         self._attr_icon = config.get("icon")
         self._attr_native_unit_of_measurement = config.get("unit")
         self._attr_native_step = config.get("step", 1)
@@ -78,8 +78,8 @@ class HanchueNumber(CoordinatorEntity, NumberEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.data["device_id"])},
-            name=f"Hanchuess {self._entry.data['device_id']}",
+            identifiers={(DOMAIN, self._entry.data["sn"])},
+            name=f"Hanchuess {self._entry.data['sn']}",
             manufacturer="Hanchuess",
             model="ESS Device",
         )
@@ -102,7 +102,7 @@ class HanchueNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         success = await self.coordinator.client.async_device_control(
-            self._entry.data["device_id"],
+            self._entry.data["sn"],
             {self._config["control_key"]: str(int(value))},
         )
         if success:

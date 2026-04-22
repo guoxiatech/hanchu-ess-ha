@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICE_DEVICE_CONTROL = "device_control"
 SERVICE_SCHEMA = vol.Schema({
-    vol.Required("device_id"): cv.string,
+    vol.Required("sn"): cv.string,
     vol.Required("value_map"): dict,
 })
 
@@ -72,19 +72,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Register service for batch control
     async def handle_device_control(call: ServiceCall):
-        device_id = call.data["device_id"]
+        sn = call.data["sn"]
         value_map = call.data["value_map"]
-        _LOGGER.info("[HANCHUESS] service device_control: %s %s", device_id, value_map)
+        _LOGGER.info("[HANCHUESS] service device_control: %s %s", sn, value_map)
         target_client = None
         for eid, data in hass.data[DOMAIN].items():
             if isinstance(data, dict) and "realtime" in data:
-                if data["realtime"].entry.data.get("device_id") == device_id:
+                if data["realtime"].entry.data.get("sn") == sn:
                     target_client = data["realtime"].client
                     break
         if not target_client:
-            _LOGGER.error("[HANCHUESS] device_control: device %s not found", device_id)
+            _LOGGER.error("[HANCHUESS] device_control: device %s not found", sn)
             return
-        result = await target_client.async_device_control(device_id, value_map)
+        result = await target_client.async_device_control(sn, value_map)
         if result is not True:
             _LOGGER.error("[HANCHUESS] device_control failed: %s", result)
 
@@ -101,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 DOMAIN,
                 context={"source": "import"},
                 data={
-                    "device_id": item["sn"],
+                    "sn": item["sn"],
                     "dev_type": item.get("devType", "2"),
                     "token": entry.data["token"],
                 },

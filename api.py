@@ -96,10 +96,10 @@ class HanchuessApiClient:
             return result.get("data", [])
         return []
 
-    async def async_get_device_status(self, device_id: str, language: str = "en") -> dict | None:
+    async def async_get_device_status(self, sn: str, language: str = "en") -> dict | None:
         result = await self._request(
             "/gateway/app/ha/getDeviceStatus",
-            {"deviceId": device_id},
+            {"sn": sn},
             language=language,
         )
         if result and result.get("code") == 401:
@@ -108,10 +108,10 @@ class HanchuessApiClient:
             return result.get("data", {})
         return {}
 
-    async def async_get_device_statistics(self, device_id: str, language: str = "en") -> dict | None:
+    async def async_get_device_statistics(self, sn: str, language: str = "en") -> dict | None:
         result = await self._request(
             "/gateway/app/ha/getDeviceStatistics",
-            {"deviceId": device_id},
+            {"sn": sn},
             language=language,
         )
         if result and result.get("code") == 401:
@@ -130,10 +130,10 @@ class HanchuessApiClient:
             return result
         return {}
 
-    async def async_device_control(self, device_id: str, value_map: dict) -> bool | str:
+    async def async_device_control(self, sn: str, value_map: dict) -> bool | str:
         result = await self._request(
             "/gateway/app/ha/deviceControl",
-            {"deviceId": device_id, "valueMap": value_map},
+            {"sn": sn, "valueMap": value_map},
         )
         if result and result.get("code") == 401:
             return "token_expired"

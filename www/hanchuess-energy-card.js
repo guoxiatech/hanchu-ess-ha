@@ -264,6 +264,6 @@ customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "hanchuess-energy-card",
-  name: "Hanchuess Energy Settings",
-  description: "Control energy settings for Hanchuess inverter",
+  name: "Hanchuess 储能设置",
+  description: "Hanchuess 逆变器储能设置卡片",
 });

@@ -82,7 +82,7 @@ class HanchueSensor(CoordinatorEntity, SensorEntity):
         self._sensor_key = sensor_key
         self._config = config
         self._attr_translation_key = sensor_key
-        self._attr_unique_id = f"{entry.entry_id}_{sensor_key}"
+        self._attr_unique_id = f"{entry.data['sn']}_{sensor_key}"
         self._attr_icon = config.get("icon")
         if "device_class" in config:
             self._attr_device_class = config["device_class"]
@@ -94,8 +94,8 @@ class HanchueSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.data["device_id"])},
-            name=f"Hanchuess {self._entry.data['device_id']}",
+            identifiers={(DOMAIN, self._entry.data["sn"])},
+            name=f"Hanchuess {self._entry.data['sn']}",
             manufacturer="Hanchuess",
             model="ESS Device",
         )

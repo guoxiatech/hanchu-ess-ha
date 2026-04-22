@@ -53,7 +53,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_unique_id = f"{entry.entry_id}_work_mode"
+        self._attr_unique_id = f"{entry.data['sn']}_work_mode"
         self._work_mode_options = []
         self._signal = "WORK_MODE_CMB"
         self._menu_loaded = False
@@ -61,15 +61,15 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.data["device_id"])},
-            name=f"Hanchuess {self._entry.data['device_id']}",
+            identifiers={(DOMAIN, self._entry.data["sn"])},
+            name=f"Hanchuess {self._entry.data['sn']}",
             manufacturer="Hanchuess",
             model="ESS Device",
         )
 
     @property
     def extra_state_attributes(self):
-        return {"device_id": self._entry.data["device_id"]}
+        return {"sn": self._entry.data["sn"]}
 
     @property
     def available(self) -> bool:
@@ -105,7 +105,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
     async def _refresh_menu(self) -> None:
         language = self.hass.config.language or "en"
-        device_id = self._entry.data["device_id"]
+        device_id = self._entry.data["sn"]
         menu_data = await self.coordinator.client.async_get_menu(device_id, language)
         options = _parse_work_mode_options(menu_data)
         if options:
@@ -122,7 +122,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
             return
 
         success = await self.coordinator.client.async_device_control(
-            self._entry.data["device_id"],
+            self._entry.data["sn"],
             {self._signal: str(value)},
         )
         if success is True:
