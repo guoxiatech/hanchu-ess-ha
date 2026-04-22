@@ -125,6 +125,24 @@ class HanchuessEnergyCard extends HTMLElement {
         .status { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; text-align: center; }
         .status.error { color: var(--error-color); }
         .status.success { color: var(--success-color, #4caf50); }
+        .collapse-card { border: 1px solid var(--divider-color); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+        .collapse-header { display: flex; align-items: center; padding: 10px 12px; user-select: none; gap: 8px; }
+        .collapse-arrow { font-size: 10px; transition: transform .2s; color: var(--secondary-text-color); cursor: pointer; }
+        .collapse-arrow.open { transform: rotate(90deg); }
+        .collapse-title { flex: 1; font-size: 14px; font-weight: 500; cursor: pointer; }
+        .collapse-sw-label { font-size: 13px; color: var(--secondary-text-color); white-space: nowrap; }
+        .collapse-body { display: none; padding: 0 12px 12px; }
+        .collapse-body.open { display: block; }
+        .collapse-row { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
+        .collapse-row label { min-width: 80px; font-size: 13px; color: var(--secondary-text-color); white-space: nowrap; }
+        .collapse-row label .req { color: var(--error-color, #db4437); }
+        .collapse-row input, .collapse-row select { flex: 1; padding: 8px; border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); font-size: 14px; box-sizing: border-box; }
+        .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider { position: absolute; inset: 0; background: var(--divider-color); border-radius: 22px; cursor: pointer; transition: .3s; }
+        .toggle .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+        .toggle input:checked + .slider { background: var(--primary-color); }
+        .toggle input:checked + .slider::before { transform: translateX(18px); }
       </style>
       <ha-card>
         <div class="header">
@@ -199,70 +217,82 @@ class HanchuessEnergyCard extends HTMLElement {
     if (!container || container.dataset.rendered === "true") return;
 
     let html = "";
-    // Group time fields by type (chg/dschg) and index (1/2/3)
-    const timeGroups = {}; // { "chg": [{field, index}], "dschg": [{field, index}] }
-
     for (const field of fields) {
-      const listenerAttr = field.listener_code
+      const la = field.listener_code
         ? `data-listener-code="${field.listener_code}" data-listener-show="${field.listener_show}"`
         : "";
-      const hiddenClass = field.hidden || field.listener_code ? "dynamic-field" : "dynamic-field visible";
+      const cls = field.hidden || field.listener_code ? "dynamic-field" : "dynamic-field visible";
 
       if (field.type === "1") {
-        const min = field.min || "0";
-        const max = field.max || "99999";
-        html += `
-          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}">
-            <div class="field">
-              <label>${field.name}</label>
-              <input type="number" data-signal="${field.signal}" min="${min}" max="${max}" placeholder="[${min}, ${max}]">
-            </div>
-          </div>
-        `;
+        const min = field.min || "0", max = field.max || "99999";
+        html += `<div class="${cls}" ${la} data-signal="${field.signal}"><div class="field"><label>${field.name}</label><input type="number" data-signal="${field.signal}" min="${min}" max="${max}" placeholder="[${min}, ${max}]"></div></div>`;
       }
 
       if (field.type === "6") {
-        const signals = (field.signal || "").split(",");
-        const startSignal = signals[0] || "";
-        const endSignal = signals[1] || "";
-        // Determine group: chg_tim_range_X or dschg_tim_range_X
+        const sigs = (field.signal || "").split(",");
         const code = field.code || "";
-        const isChg = code.startsWith("chg_tim");
-        const isDschg = code.startsWith("dschg_tim");
-        const match = code.match(/(\d)$/);
-        const index = match ? match[1] : "1";
-        const groupKey = isChg ? "chg" : isDschg ? "dschg" : code;
+        const gk = code.startsWith("chg_tim") ? "chg" : code.startsWith("dschg_tim") ? "dschg" : code;
+        const idx = (code.match(/(\d)$/) || [,"1"])[1];
+        html += `<div class="${cls}" ${la} data-signal="${field.signal}" data-time-group="${gk}" data-time-index="${idx}"><div class="time-row"><span class="time-label">${field.name}</span><input type="time" data-signal="${sigs[0]||""}"><span>-</span><input type="time" data-signal="${sigs[1]||""}"><button class="icon-btn del" data-action="del-time" data-group="${gk}" data-index="${idx}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${gk}" data-index="${idx}" style="display:none">+</button></div></div>`;
+      }
 
-        html += `
-          <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}" data-time-group="${groupKey}" data-time-index="${index}">
-            <div class="time-row">
-              <span class="time-label">${field.name}</span>
-              <input type="time" data-signal="${startSignal}" placeholder="开始时间">
-              <span>-</span>
-              <input type="time" data-signal="${endSignal}" placeholder="结束时间">
-              <button class="icon-btn del" data-action="del-time" data-group="${groupKey}" data-index="${index}" title="删除">🗑</button>
-              <button class="icon-btn add" data-action="add-time" data-group="${groupKey}" data-index="${index}" title="添加" style="display:none">+</button>
-            </div>
-          </div>
-        `;
+      if (field.type === "82" || field.type === "83") {
+        const children = field.children || [];
+        const sig = field.signal;
+        let switchHtml = "";
+        let bodyHtml = "";
+        for (const c of children) {
+          const ci = c.index != null ? c.index : 0;
+          if (c.type === "4") {
+            switchHtml = `<span class="collapse-sw-label">${c.name}</span><label class="toggle"><input type="checkbox" data-arr-signal="${sig}" data-arr-index="${ci}" data-on="${c.onVal||"1"}" data-off="${c.offVal||"0"}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
+          } else if (c.type === "6") {
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="time" data-arr-signal="${sig}" data-arr-index="${ci}" data-arr-fmt="time"><span style="color:var(--secondary-text-color)">-</span><input type="time" data-arr-signal="${sig}" data-arr-index="${ci + 1}" data-arr-fmt="time"></div>`;
+          } else if (c.type === "1") {
+            const mn = c.min||"0", mx = c.max||"99999";
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="number" data-arr-signal="${sig}" data-arr-index="${ci}" min="${mn}" max="${mx}" placeholder="[${mn}, ${mx}]"></div>`;
+          } else if (c.type === "3") {
+            const opts = (c.options||[]).map(o => `<option value="${o.value}">${o.name}</option>`).join("");
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><select data-arr-signal="${sig}" data-arr-index="${ci}">${opts}</select></div>`;
+          }
+        }
+        html += `<div class="${cls}" ${la} data-signal="${sig}" data-collapse="${field.code}"><div class="collapse-card"><div class="collapse-header"><span class="collapse-arrow" data-arrow="${field.code}" data-toggle="${field.code}">▶</span><span class="collapse-title" data-toggle="${field.code}">${field.name}</span>${switchHtml}</div><div class="collapse-body" data-body="${field.code}">${bodyHtml}</div></div></div>`;
       }
     }
 
     container.innerHTML = html;
     container.dataset.rendered = "true";
 
-    // Bind time add/delete events
     container.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-action]");
-      if (!btn) return;
-      const action = btn.dataset.action;
-      const group = btn.dataset.group;
-      const index = btn.dataset.index;
+      if (btn) {
+        const {action, group, index} = btn.dataset;
+        if (action === "del-time") this._deleteTimeSlot(group, index);
+        else if (action === "add-time") this._addTimeSlot(group, index);
+        return;
+      }
+      const hdr = e.target.closest("[data-toggle]");
+      if (hdr) {
+        const code = hdr.dataset.toggle;
+        const body = container.querySelector(`[data-body="${code}"]`);
+        const arrow = container.querySelector(`[data-arrow="${code}"]`);
+        if (body) body.classList.toggle("open");
+        if (arrow) arrow.classList.toggle("open");
+      }
+    });
 
-      if (action === "del-time") {
-        this._deleteTimeSlot(group, index);
-      } else if (action === "add-time") {
-        this._addTimeSlot(group, index);
+    container.addEventListener("change", (e) => {
+      const sw = e.target.closest("[data-collapse-switch]");
+      if (sw) {
+        const code = sw.dataset.collapseSwitch;
+        const body = container.querySelector(`[data-body="${code}"]`);
+        const arrow = container.querySelector(`[data-arrow="${code}"]`);
+        if (sw.checked) {
+          if (body) body.classList.add("open");
+          if (arrow) arrow.classList.add("open");
+        } else {
+          if (body) body.classList.remove("open");
+          if (arrow) arrow.classList.remove("open");
+        }
       }
     });
   }
@@ -449,8 +479,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const fields = state.attributes.energy_fields || [];
     for (const field of fields) {
       if (field.signal) {
-        const signals = field.signal.split(",");
-        signals.forEach(s => { if (s) keys.push(s); });
+        field.signal.split(",").forEach(s => { if (s) keys.push(s); });
       }
     }
 
@@ -458,6 +487,7 @@ class HanchuessEnergyCard extends HTMLElement {
     if (wmOptions.length > 0) {
       keys.push(wmOptions[0].signal || "WORK_MODE_CMB");
     }
+    if (!keys.includes("FLAG_ENABLE_CYCLE")) keys.push("FLAG_ENABLE_CYCLE");
 
     try {
       const result = await this._hass.callWS({
@@ -485,7 +515,7 @@ class HanchuessEnergyCard extends HTMLElement {
 
       // Fill dynamic fields
       const container = this.shadowRoot.getElementById("dynamic_fields");
-      const inputs = container.querySelectorAll("input");
+      const inputs = container.querySelectorAll("input[data-signal]");
       inputs.forEach(input => {
         const signal = input.dataset.signal;
         if (signal && result[signal] !== undefined) {
@@ -496,6 +526,47 @@ class HanchuessEnergyCard extends HTMLElement {
           } else {
             input.value = result[signal];
           }
+        }
+      });
+
+      // Fill selects in collapse cards
+      container.querySelectorAll("select[data-signal]").forEach(sel => {
+        const signal = sel.dataset.signal;
+        if (signal && result[signal] !== undefined) sel.value = String(result[signal]);
+      });
+
+      // Fill collapse card array fields (82/83)
+      container.querySelectorAll("[data-arr-signal]").forEach(el => {
+        const sig = el.dataset.arrSignal;
+        const idx = parseInt(el.dataset.arrIndex);
+        if (!sig || isNaN(idx) || result[sig] === undefined) return;
+        let arr;
+        try { arr = JSON.parse(result[sig]); } catch { return; }
+        if (!Array.isArray(arr) || idx >= arr.length) return;
+        const val = arr[idx];
+        if (el.type === "checkbox") {
+          el.checked = String(val) === (el.dataset.on || "1");
+        } else if (el.type === "time" || el.dataset.arrFmt === "time") {
+          const s = String(val).padStart(4, "0");
+          el.value = s.slice(0,2) + ":" + s.slice(2,4);
+        } else if (el.tagName === "SELECT") {
+          el.value = String(val);
+        } else {
+          el.value = String(val).replace(/"/g, "");
+        }
+      });
+
+      // Handle collapse card expand state based on switch
+      container.querySelectorAll("[data-collapse-switch]").forEach(sw => {
+        const code = sw.dataset.collapseSwitch;
+        const body = container.querySelector(`[data-body="${code}"]`);
+        const arrow = container.querySelector(`[data-arrow="${code}"]`);
+        if (sw.checked) {
+          if (body) body.classList.add("open");
+          if (arrow) arrow.classList.add("open");
+        } else {
+          if (body) body.classList.remove("open");
+          if (arrow) arrow.classList.remove("open");
         }
       });
 
@@ -563,9 +634,10 @@ class HanchuessEnergyCard extends HTMLElement {
     const visibleFields = container.querySelectorAll(".dynamic-field.visible");
     const changedSignals = new Set();
 
-    // First pass: find changed signals
+    // First pass: find changed signals (for non-collapse fields)
     visibleFields.forEach(fieldEl => {
-      const inputs = fieldEl.querySelectorAll("input");
+      if (fieldEl.dataset.collapse) return; // skip collapse cards, handled separately
+      const inputs = fieldEl.querySelectorAll("input[data-signal], select[data-signal]");
       inputs.forEach(input => {
         const signal = input.dataset.signal;
         if (!signal) return;
@@ -602,7 +674,7 @@ class HanchuessEnergyCard extends HTMLElement {
 
     // Second pass: collect values, pair time fields together
     visibleFields.forEach(fieldEl => {
-      const inputs = fieldEl.querySelectorAll("input");
+      const inputs = fieldEl.querySelectorAll("input[data-signal], select[data-signal]");
       const fieldSignals = Array.from(inputs).map(i => i.dataset.signal).filter(Boolean);
 
       const hasChange = fieldSignals.some(s => changedSignals.has(s));
@@ -621,6 +693,41 @@ class HanchuessEnergyCard extends HTMLElement {
         }
       });
     });
+
+    // Collect collapse card (82/83) array values
+    const collapseFields = container.querySelectorAll(".dynamic-field.visible[data-collapse]");
+    collapseFields.forEach(fieldEl => {
+      const sig = fieldEl.dataset.signal;
+      if (!sig) return;
+      const arrEls = fieldEl.querySelectorAll("[data-arr-signal]");
+      // Rebuild array from current UI values
+      let origArr;
+      try { origArr = JSON.parse(this._originalValues[sig] || "[]"); } catch { origArr = []; }
+      const newArr = [...origArr];
+      arrEls.forEach(el => {
+        const idx = parseInt(el.dataset.arrIndex);
+        if (isNaN(idx)) return;
+        let val;
+        if (el.type === "checkbox") {
+          val = el.checked ? Number(el.dataset.on || 1) : Number(el.dataset.off || 0);
+        } else if (el.type === "time" || el.dataset.arrFmt === "time") {
+          val = (el.value || "00:00").replace(":", "");
+        } else if (el.type === "number") {
+          val = el.value;
+        } else {
+          val = el.tagName === "SELECT" ? Number(el.value) : el.value;
+        }
+        newArr[idx] = val;
+      });
+      const newStr = JSON.stringify(newArr);
+      const origStr = JSON.stringify(origArr);
+      if (newStr !== origStr) {
+        valueMap[sig] = newStr;
+      }
+    });
+
+    // Collect FLAG_ENABLE_CYCLE from all collapse switches
+    this._collectEnableCycle(container, valueMap);
 
     // Collect deleted time slots (send 0)
     allTimeSlots.forEach(slot => {
@@ -667,6 +774,27 @@ class HanchuessEnergyCard extends HTMLElement {
 
     submitBtn.disabled = false;
     setTimeout(() => { statusMsg.textContent = ""; }, 3000);
+  }
+
+  _collectEnableCycle(container, valueMap) {
+    // FLAG_ENABLE_CYCLE = [chg0,chg1,chg2,dischg0,dischg1,dischg2]
+    let origCycle;
+    try { origCycle = JSON.parse(this._originalValues["FLAG_ENABLE_CYCLE"] || "[0,0,0,0,0,0]"); } catch { origCycle = [0,0,0,0,0,0]; }
+    const newCycle = [...origCycle];
+    container.querySelectorAll("[data-collapse-switch]").forEach(sw => {
+      const sig = sw.dataset.arrSignal;
+      if (!sig) return;
+      // Determine cycle index from signal name: TCT_CHG0->0, TCT_CHG1->1, TCT_CHG2->2, TCT_DISCHG0->3...
+      const m = sig.match(/TCT_(CHG|DISCHG)(\d)/);
+      if (!m) return;
+      const ci = m[1] === "CHG" ? Number(m[2]) : 3 + Number(m[2]);
+      newCycle[ci] = sw.checked ? 1 : 0;
+    });
+    const newStr = JSON.stringify(newCycle);
+    const origStr = JSON.stringify(origCycle);
+    if (newStr !== origStr) {
+      valueMap["FLAG_ENABLE_CYCLE"] = newStr;
+    }
   }
 
   getCardSize() {

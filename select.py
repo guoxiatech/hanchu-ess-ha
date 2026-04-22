@@ -72,6 +72,34 @@ def _parse_energy_menu(menu_data: dict) -> dict:
             if item_type == "6":
                 field["format"] = item.get("defFmt", "HH:mm")
 
+            # Collapsible time period (type=82/83)
+            # Signal value is a JSON array string: [mode, enabled, "power", "startTime", "endTime"]
+            if item_type in ("82", "83"):
+                children = []
+                for child in item.get("children", []):
+                    c = {
+                        "code": child.get("itemCode", ""),
+                        "type": child.get("itemType", ""),
+                        "name": child.get("itemName", ""),
+                        "index": child.get("index", 0),
+                    }
+                    ct = child.get("itemType", "")
+                    if ct == "1":
+                        c["min"] = child.get("minVal", "")
+                        c["max"] = child.get("maxVal", "")
+                    if ct == "3":
+                        try:
+                            c["options"] = json.loads(child.get("optVal", "[]"))
+                        except (json.JSONDecodeError, KeyError):
+                            c["options"] = []
+                    if ct == "4":
+                        c["onVal"] = child.get("onVal")
+                        c["offVal"] = child.get("offVal")
+                    if ct == "6":
+                        c["format"] = child.get("defFmt", "HH:mm")
+                    children.append(c)
+                field["children"] = children
+
             # Listener (show/hide based on work mode)
             listener = item.get("listener")
             if listener:
