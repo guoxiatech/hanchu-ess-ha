@@ -421,6 +421,14 @@ class HanchuessEnergyCard extends HTMLElement {
       }
     }
 
+    // Determine work mode item codes for listener matching
+    const wmCodes = new Set(["work_mode"]);
+    for (const opt of wmOptions) {
+      if (opt.signal) wmCodes.add(opt.signal);
+    }
+    // Also add WORK_MODE_CMB as it's used as listener code
+    wmCodes.add("WORK_MODE_CMB");
+
     const allFields = this.shadowRoot.querySelectorAll(".dynamic-field");
     allFields.forEach(el => {
       const listenerCode = el.dataset.listenerCode;
@@ -431,7 +439,7 @@ class HanchuessEnergyCard extends HTMLElement {
         return;
       }
 
-      if (listenerCode === "work_mode") {
+      if (wmCodes.has(listenerCode)) {
         const showValues = (listenerShow || "").split(",");
         if (showValues.includes(currentValue)) {
           if (el.dataset.timeHidden !== "true") {
