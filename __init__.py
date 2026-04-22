@@ -17,6 +17,8 @@ SERVICE_SCHEMA = vol.Schema({
     vol.Required("value_map"): dict,
 })
 
+CARD_URL = "/hacsfiles/hanchuess/hanchuess-energy-card.js"
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
@@ -31,10 +33,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         )
     ])
 
-    # Auto inject card JS into frontend
-    from homeassistant.components.frontend import add_extra_js_url
-    add_extra_js_url(hass, "/hacsfiles/hanchuess/hanchuess-energy-card.js")
-
     return True
 
 
@@ -43,22 +41,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Auto register card resource (only once)
     if not hass.data[DOMAIN].get("_card_registered"):
-        try:
-            from homeassistant.components.lovelace import DOMAIN as LOVELACE_DOMAIN
-            lovelace = hass.data.get(LOVELACE_DOMAIN)
-            if lovelace and "resources" in lovelace:
-                resources = lovelace["resources"]
-                card_url = "/hacsfiles/hanchuess/hanchuess-energy-card.js"
-                existing = [r for r in resources.async_items() if "hanchuess-energy-card" in r.get("url", "")]
-                if not existing:
-                    await resources.async_create_item({
-                        "res_type": "module",
-                        "url": card_url,
-                    })
-                    _LOGGER.info("[HANCHUESS] Card resource registered")
-            hass.data[DOMAIN]["_card_registered"] = True
-        except Exception as err:
-            _LOGGER.warning("[HANCHUESS] Card resource auto-register failed: %s", err)
+        # Log all lovelace related keys to find the right one
+        lovelace_keys = [k for k in hass.data.keys() if "lovelace" in str(k).lower()]
+        _LOGGER.warning("[HANCHUESS] lovelace keys in hass.data: %s", lovelace_keys)
+        for key in lovelace_keys:
+            val = hass.data[key]
+            _LOGGER.warning("[HANCHUESS] hass.data[%s] type=%s value=%s", key, type(val).__name__, str(val)[:200])
+
+        hass.data[DOMAIN]["_card_registered"] = True
 
     client = HanchuessApiClient(
         domain=BASE_URL,
