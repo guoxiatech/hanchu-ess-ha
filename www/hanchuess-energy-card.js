@@ -726,40 +726,44 @@ class HanchuessEnergyCard extends HTMLElement {
       });
     });
 
-    // Collect collapse card (82/83) array values
+    // Collect ALL collapse card (82/83) array values - must submit all together
     const collapseFields = container.querySelectorAll(".dynamic-field.visible[data-collapse]");
-    collapseFields.forEach(fieldEl => {
-      const sig = fieldEl.dataset.signal;
-      if (!sig) return;
-      const arrEls = fieldEl.querySelectorAll("[data-arr-signal]");
-      // Rebuild array from current UI values
-      let origArr;
-      try { origArr = JSON.parse(this._originalValues[sig] || "[]"); } catch { origArr = []; }
-      const newArr = [...origArr];
-      arrEls.forEach(el => {
-        const idx = parseInt(el.dataset.arrIndex);
-        if (isNaN(idx)) return;
-        let val;
-        if (el.type === "checkbox") {
-          val = el.checked ? Number(el.dataset.on || 1) : Number(el.dataset.off || 0);
-        } else if (el.type === "time" || el.dataset.arrFmt === "time") {
-          val = (el.value || "00:00").replace(":", "");
-        } else if (el.type === "number") {
-          val = el.value;
-        } else {
-          val = el.tagName === "SELECT" ? Number(el.value) : el.value;
-        }
-        newArr[idx] = val;
+    if (collapseFields.length > 0) {
+      let hasAnyChange = false;
+      const collapseValues = {};
+      collapseFields.forEach(fieldEl => {
+        const sig = fieldEl.dataset.signal;
+        if (!sig) return;
+        const arrEls = fieldEl.querySelectorAll("[data-arr-signal]");
+        let origArr;
+        try { origArr = JSON.parse(this._originalValues[sig] || "[]"); } catch { origArr = []; }
+        const newArr = [...origArr];
+        arrEls.forEach(el => {
+          const idx = parseInt(el.dataset.arrIndex);
+          if (isNaN(idx)) return;
+          let val;
+          if (el.type === "time" || el.dataset.arrFmt === "time") {
+            val = (el.value || "00:00").replace(":", "");
+          } else if (el.type === "number") {
+            val = el.value;
+          } else {
+            val = el.tagName === "SELECT" ? Number(el.value) : el.value;
+          }
+          newArr[idx] = val;
+        });
+        collapseValues[sig] = JSON.stringify(newArr);
+        if (collapseValues[sig] !== JSON.stringify(origArr)) hasAnyChange = true;
       });
-      const newStr = JSON.stringify(newArr);
-      const origStr = JSON.stringify(origArr);
-      if (newStr !== origStr) {
-        valueMap[sig] = newStr;
+      // Check FLAG_ENABLE_CYCLE change
+      this._collectEnableCycle(container, collapseValues);
+      if (collapseValues["FLAG_ENABLE_CYCLE"] || hasAnyChange) {
+        // Submit all TCT + FLAG_ENABLE_CYCLE together
+        Object.assign(valueMap, collapseValues);
+        if (!valueMap["FLAG_ENABLE_CYCLE"]) {
+          valueMap["FLAG_ENABLE_CYCLE"] = this._originalValues["FLAG_ENABLE_CYCLE"] || "[0,0,0,0,0,0]";
+        }
       }
-    });
-
-    // Collect FLAG_ENABLE_CYCLE from all collapse switches
-    this._collectEnableCycle(container, valueMap);
+    }
 
     // Collect deleted time slots (send 0)
     allTimeSlots.forEach(slot => {
@@ -808,10 +812,9 @@ class HanchuessEnergyCard extends HTMLElement {
     setTimeout(() => { statusMsg.textContent = ""; }, 3000);
   }
 
-  _collectEnableCycle(container, valueMap) {
-    if (!this._originalValues["FLAG_ENABLE_CYCLE"]) return;
+  _collectEnableCycle(container, targetMap) {
     let origCycle;
-    try { origCycle = JSON.parse(this._originalValues["FLAG_ENABLE_CYCLE"]); } catch { return; }
+    try { origCycle = JSON.parse(this._originalValues["FLAG_ENABLE_CYCLE"] || "[0,0,0,0,0,0]"); } catch { origCycle = [0,0,0,0,0,0]; }
     const newCycle = [...origCycle];
     container.querySelectorAll("[data-enable-signal]").forEach(sw => {
       const code = sw.dataset.enableSignal;
@@ -821,7 +824,7 @@ class HanchuessEnergyCard extends HTMLElement {
       newCycle[ci] = sw.checked ? 1 : 0;
     });
     const newStr = JSON.stringify(newCycle);
-    if (newStr !== JSON.stringify(origCycle)) valueMap["FLAG_ENABLE_CYCLE"] = newStr;
+    if (newStr !== JSON.stringify(origCycle)) targetMap["FLAG_ENABLE_CYCLE"] = newStr;
   }
 
   getCardSize() {
