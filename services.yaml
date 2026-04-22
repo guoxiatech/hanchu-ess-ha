@@ -2,9 +2,9 @@ device_control:
   name: Device Control
   description: Send control commands to a Hanchuess device
   fields:
-    device_id:
-      name: Device ID
-      description: The SN of the device
+    sn:
+      name: SN
+      description: The serial number of the device
       required: true
       selector:
         text:

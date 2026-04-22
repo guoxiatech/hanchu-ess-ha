@@ -47,14 +47,14 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
         self._entry = entry
         self._config = config
         self._attr_translation_key = switch_key
-        self._attr_unique_id = f"{entry.data['device_id']}_{switch_key}"
+        self._attr_unique_id = f"{entry.data['sn']}_{switch_key}"
         self._attr_icon = config.get("icon")
 
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.data["device_id"])},
-            name=f"Hanchuess {self._entry.data['device_id']}",
+            identifiers={(DOMAIN, self._entry.data["sn"])},
+            name=f"Hanchuess {self._entry.data['sn']}",
             manufacturer="Hanchuess",
             model="ESS Device",
         )
@@ -72,7 +72,7 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         success = await self.coordinator.client.async_device_control(
-            self._entry.data["device_id"],
+            self._entry.data["sn"],
             {self._config["control_key"]: "1"},
         )
         if success:
@@ -80,7 +80,7 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         success = await self.coordinator.client.async_device_control(
-            self._entry.data["device_id"],
+            self._entry.data["sn"],
             {self._config["control_key"]: "0"},
         )
         if success:

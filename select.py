@@ -105,8 +105,8 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
     async def _refresh_menu(self) -> None:
         language = self.hass.config.language or "en"
-        device_id = self._entry.data["sn"]
-        menu_data = await self.coordinator.client.async_get_menu(device_id, language)
+        sn = self._entry.data["sn"]
+        menu_data = await self.coordinator.client.async_get_menu(sn, language)
         options = _parse_work_mode_options(menu_data)
         if options:
             self._work_mode_options = options

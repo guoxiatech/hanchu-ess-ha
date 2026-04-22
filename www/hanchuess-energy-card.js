@@ -1,7 +1,7 @@
 // ===== Card Editor =====
 class HanchuessEnergyCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = Object.assign({ entity: "", device_id: "" }, config || {});
+    this._config = Object.assign({ entity: "", sn: "" }, config || {});
     this._render();
   }
 
@@ -34,9 +34,9 @@ class HanchuessEnergyCardEditor extends HTMLElement {
     this.querySelector("#entity_select").addEventListener("change", (e) => {
       const entityId = e.target.value;
       const state = this._hass.states[entityId];
-      const deviceId = state && state.attributes ? (state.attributes.device_id || "") : "";
+      const sn = state && state.attributes ? (state.attributes.sn || "") : "";
 
-      this._config = { ...this._config, entity: entityId, device_id: deviceId };
+      this._config = { ...this._config, entity: entityId, sn: sn };
       this.dispatchEvent(new CustomEvent("config-changed", {
         detail: { config: this._config },
         bubbles: true,
@@ -59,7 +59,7 @@ class HanchuessEnergyCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = Object.assign({ entity: "", device_id: "" }, config || {});
+    this._config = Object.assign({ entity: "", sn: "" }, config || {});
     this._rendered = false;
   }
 
@@ -71,8 +71,8 @@ class HanchuessEnergyCard extends HTMLElement {
     const entity = Object.keys(hass.states)
       .find(eid => eid.startsWith("select.") && eid.includes("work_mode")) || "";
     const state = hass.states[entity];
-    const deviceId = state && state.attributes ? (state.attributes.device_id || "") : "";
-    return { entity, device_id: deviceId };
+    const sn = state && state.attributes ? (state.attributes.sn || "") : "";
+    return { entity, sn };
   }
 
   _render() {
@@ -110,7 +110,6 @@ class HanchuessEnergyCard extends HTMLElement {
         .status { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; text-align: center; }
         .status.error { color: var(--error-color); }
         .status.success { color: var(--success-color, #4caf50); }
-        .no-entity { padding: 16px; color: var(--secondary-text-color); text-align: center; }
       </style>
       <ha-card>
         <div class="title">储能设置 - <span id="device_sn" class="sn"></span></div>
@@ -173,7 +172,7 @@ class HanchuessEnergyCard extends HTMLElement {
 
     // Show device SN
     const snEl = this.shadowRoot.getElementById("device_sn");
-    if (snEl) snEl.textContent = this._config.device_id || "";
+    if (snEl) snEl.textContent = this._config.sn || "";
 
     // Check online status
     const isOnline = state.state !== "unavailable";
@@ -220,7 +219,7 @@ class HanchuessEnergyCard extends HTMLElement {
     statusMsg.className = "status";
 
     const entityId = this._config.entity;
-    const deviceId = this._config.device_id;
+    const sn = this._config.sn;
     const workMode = this.shadowRoot.getElementById("work_mode").value;
 
     try {
@@ -232,7 +231,7 @@ class HanchuessEnergyCard extends HTMLElement {
       const isTou = workMode === "分时充放" || workMode === "Time of Use" || workMode === "TOU";
       if (isTou) {
         await this._hass.callService("hanchuess", "device_control", {
-          device_id: deviceId,
+          sn: sn,
           value_map: {
             "TCT_START_1": this._timeToSignal(this.shadowRoot.getElementById("chg_start_1").value),
             "TCT_END_1": this._timeToSignal(this.shadowRoot.getElementById("chg_end_1").value),
