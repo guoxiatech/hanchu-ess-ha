@@ -71,17 +71,19 @@ class HanchueSwitch(CoordinatorEntity, SwitchEntity):
         return bool(value)
 
     async def async_turn_on(self, **kwargs) -> None:
-        success = await self.coordinator.client.async_device_control(
+        result = await self.coordinator.client.async_device_control(
             self._entry.data["sn"],
+            self._entry.data.get("dev_type", "2"),
             {self._config["control_key"]: "1"},
         )
-        if success:
+        if result.get("success"):
             await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
-        success = await self.coordinator.client.async_device_control(
+        result = await self.coordinator.client.async_device_control(
             self._entry.data["sn"],
+            self._entry.data.get("dev_type", "2"),
             {self._config["control_key"]: "0"},
         )
-        if success:
+        if result.get("success"):
             await self.coordinator.async_request_refresh()

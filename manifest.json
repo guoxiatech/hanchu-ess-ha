@@ -3,7 +3,7 @@
   "name": "Hanchuess",
   "documentation": "https://github.com/yourusername/hanchu-ess-ha",
   "requirements": [],
-  "dependencies": ["frontend"],
+  "dependencies": ["frontend", "http", "websocket_api"],
   "codeowners": [],
   "version": "1.0.0",
   "iot_class": "cloud_polling",

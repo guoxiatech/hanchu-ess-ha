@@ -8,8 +8,14 @@ device_control:
       required: true
       selector:
         text:
-    value_map:
-      name: Value Map
+    dev_type:
+      name: Device Type
+      description: The device type (e.g. 2 for inverter)
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
       description: Key-value pairs of control signals
       required: true
       selector:

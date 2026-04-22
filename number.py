@@ -101,9 +101,10 @@ class HanchueNumber(CoordinatorEntity, NumberEntity):
         return self.coordinator.data.get(self._config["key"])
 
     async def async_set_native_value(self, value: float) -> None:
-        success = await self.coordinator.client.async_device_control(
+        result = await self.coordinator.client.async_device_control(
             self._entry.data["sn"],
+            self._entry.data.get("dev_type", "2"),
             {self._config["control_key"]: str(int(value))},
         )
-        if success:
+        if result.get("success"):
             await self.coordinator.async_request_refresh()

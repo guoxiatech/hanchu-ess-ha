@@ -4,6 +4,7 @@ import os
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.components import websocket_api
 import homeassistant.helpers.config_validation as cv
 from .const import DOMAIN, PLATFORMS, BASE_URL
 from .api import HanchuessApiClient
@@ -14,7 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_DEVICE_CONTROL = "device_control"
 SERVICE_SCHEMA = vol.Schema({
     vol.Required("sn"): cv.string,
-    vol.Required("value_map"): dict,
+    vol.Required("dev_type"): cv.string,
+    vol.Required("value"): dict,
 })
 
 CARD_URL = "/hacsfiles/hanchuess/hanchuess-energy-card.js"
@@ -33,7 +35,70 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         )
     ])
 
+    # Register websocket commands
+    websocket_api.async_register_command(hass, ws_iot_get)
+    websocket_api.async_register_command(hass, ws_iot_set)
+
     return True
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hanchuess/iot_get",
+    vol.Required("sn"): str,
+    vol.Required("dev_type"): str,
+    vol.Required("keys"): [str],
+})
+@websocket_api.async_response
+async def ws_iot_get(hass, connection, msg):
+    """Handle iot_get websocket command."""
+    sn = msg["sn"]
+    dev_type = msg["dev_type"]
+    keys = msg["keys"]
+
+    target_client = None
+    for eid, data in hass.data[DOMAIN].items():
+        if isinstance(data, dict) and "realtime" in data:
+            if data["realtime"].entry.data.get("sn") == sn:
+                target_client = data["realtime"].client
+                break
+
+    if not target_client:
+        connection.send_error(msg["id"], "not_found", f"Device {sn} not found")
+        return
+
+    result = await target_client.async_iot_get(sn, dev_type, keys)
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hanchuess/iot_set",
+    vol.Required("sn"): str,
+    vol.Required("dev_type"): str,
+    vol.Required("value"): dict,
+})
+@websocket_api.async_response
+async def ws_iot_set(hass, connection, msg):
+    """Handle iot_set websocket command."""
+    sn = msg["sn"]
+    dev_type = msg["dev_type"]
+    value = msg["value"]
+
+    target_client = None
+    for eid, data in hass.data[DOMAIN].items():
+        if isinstance(data, dict) and "realtime" in data:
+            if data["realtime"].entry.data.get("sn") == sn:
+                target_client = data["realtime"].client
+                break
+
+    if not target_client:
+        connection.send_error(msg["id"], "not_found", f"Device {sn} not found")
+        return
+
+    result = await target_client.async_device_control(sn, dev_type, value)
+    if result.get("success"):
+        connection.send_result(msg["id"], result.get("data", {}))
+    else:
+        connection.send_error(msg["id"], "control_failed", result.get("msg", "Unknown error"))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -73,8 +138,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register service for batch control
     async def handle_device_control(call: ServiceCall):
         sn = call.data["sn"]
-        value_map = call.data["value_map"]
-        _LOGGER.info("[HANCHUESS] service device_control: %s %s", sn, value_map)
+        dev_type = call.data["dev_type"]
+        value = call.data["value"]
+        _LOGGER.info("[HANCHUESS] service device_control: %s %s", sn, value)
         target_client = None
         for eid, data in hass.data[DOMAIN].items():
             if isinstance(data, dict) and "realtime" in data:
@@ -84,9 +150,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not target_client:
             _LOGGER.error("[HANCHUESS] device_control: device %s not found", sn)
             return
-        result = await target_client.async_device_control(sn, value_map)
-        if result is not True:
-            _LOGGER.error("[HANCHUESS] device_control failed: %s", result)
+        result = await target_client.async_device_control(sn, dev_type, value)
+        if not result.get("success"):
+            _LOGGER.error("[HANCHUESS] device_control failed: %s", result.get("msg"))
 
     if not hass.services.has_service(DOMAIN, SERVICE_DEVICE_CONTROL):
         hass.services.async_register(

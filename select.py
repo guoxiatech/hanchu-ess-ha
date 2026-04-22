@@ -177,7 +177,8 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
         success = await self.coordinator.client.async_device_control(
             self._entry.data["sn"],
+            self._entry.data.get("dev_type", "2"),
             {self._signal: str(value)},
         )
-        if success is True:
+        if success.get("success"):
             await self.coordinator.async_request_refresh()

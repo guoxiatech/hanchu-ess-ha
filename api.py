@@ -130,11 +130,22 @@ class HanchuessApiClient:
             return result
         return {}
 
-    async def async_device_control(self, sn: str, value_map: dict) -> bool | str:
+    async def async_iot_get(self, sn: str, dev_type: str, keys: list) -> dict:
         result = await self._request(
-            "/gateway/app/ha/deviceControl",
-            {"sn": sn, "valueMap": value_map},
+            "/gateway/app/ha/iotGet",
+            {"sn": sn, "devType": dev_type, "keys": keys},
+        )
+        if result and result.get("success"):
+            return result.get("data", {})
+        return {}
+
+    async def async_device_control(self, sn: str, dev_type: str, value: dict) -> dict:
+        result = await self._request(
+            "/gateway/app/ha/iotSet",
+            {"sn": sn, "devType": dev_type, "value": value},
         )
         if result and result.get("code") == 401:
-            return "token_expired"
-        return result is not None and result.get("success", False)
+            return {"success": False, "msg": "token_expired"}
+        if result and result.get("success"):
+            return {"success": True, "data": result.get("data", {})}
+        return {"success": False, "msg": result.get("msg", "Unknown error") if result else "Request failed"}

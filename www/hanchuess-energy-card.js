@@ -55,12 +55,14 @@ class HanchuessEnergyCard extends HTMLElement {
       this._render();
       this._rendered = true;
     }
-    if (this._rendered) this._updateValues();
+    if (this._rendered) this._updateStatus();
   }
 
   setConfig(config) {
     this._config = Object.assign({ entity: "", sn: "" }, config || {});
     this._rendered = false;
+    this._originalValues = {};
+    this._dataLoaded = false;
   }
 
   static getConfigElement() {
@@ -82,8 +84,18 @@ class HanchuessEnergyCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card { padding: 16px; }
-        .title { font-size: 18px; font-weight: 500; margin-bottom: 16px; }
-        .title .sn { color: var(--primary-color); }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .title { font-size: 18px; font-weight: 500; }
+        .title .sn { color: var(--primary-color); font-size: 14px; }
+        .header-btns { display: flex; gap: 8px; }
+        .btn {
+          padding: 6px 16px; border: none; border-radius: 4px;
+          font-size: 13px; cursor: pointer; white-space: nowrap;
+        }
+        .btn-load { background: var(--primary-color); color: white; }
+        .btn-submit { background: var(--primary-color); color: white; }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .offline-banner {
           background: var(--error-color, #db4437); color: white; padding: 8px 12px;
           border-radius: 4px; margin-bottom: 12px; text-align: center; font-size: 14px;
@@ -95,34 +107,34 @@ class HanchuessEnergyCard extends HTMLElement {
           border-radius: 4px; background: var(--card-background-color);
           color: var(--primary-text-color); font-size: 14px; box-sizing: border-box;
         }
+        .field input::placeholder { color: var(--secondary-text-color); opacity: 0.6; }
         .time-group { display: flex; align-items: center; gap: 8px; }
         .time-group input { flex: 1; }
         .time-group span { color: var(--secondary-text-color); }
         .dynamic-field { display: none; }
         .dynamic-field.visible { display: block; }
         .section-title { font-size: 14px; font-weight: 500; margin: 16px 0 8px; color: var(--primary-color); }
-        .submit-btn {
-          width: 100%; padding: 10px; margin-top: 16px; border: none; border-radius: 4px;
-          background: var(--primary-color); color: white; font-size: 14px; cursor: pointer;
-        }
-        .submit-btn:hover { opacity: 0.9; }
-        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .status { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; text-align: center; }
         .status.error { color: var(--error-color); }
         .status.success { color: var(--success-color, #4caf50); }
       </style>
       <ha-card>
-        <div class="title">储能设置 - <span id="device_sn" class="sn"></span></div>
+        <div class="header">
+          <div class="title">储能设置 <span id="device_sn" class="sn"></span></div>
+          <div class="header-btns">
+            <button class="btn btn-load" id="load_btn">获取数据</button>
+            <button class="btn btn-submit" id="submit_btn">设定</button>
+          </div>
+        </div>
         <div id="offline_banner" class="offline-banner" style="display:none">设备离线，无法设置</div>
 
         <div class="field">
           <label>工作模式</label>
-          <select id="work_mode"></select>
+          <select id="work_mode"><option value="">请选择</option></select>
         </div>
 
         <div id="dynamic_fields"></div>
 
-        <button class="submit-btn" id="submit_btn">提交</button>
         <div class="status" id="status_msg"></div>
       </ha-card>
     `;
@@ -131,12 +143,16 @@ class HanchuessEnergyCard extends HTMLElement {
       this._toggleFields(e.target.value);
     });
 
+    this.shadowRoot.getElementById("load_btn").addEventListener("click", () => {
+      this._loadData();
+    });
+
     this.shadowRoot.getElementById("submit_btn").addEventListener("click", () => {
       this._submit();
     });
   }
 
-  _updateValues() {
+  _updateStatus() {
     if (!this._hass || !this._config || !this._config.entity) return;
 
     const state = this._hass.states[this._config.entity];
@@ -148,28 +164,29 @@ class HanchuessEnergyCard extends HTMLElement {
     const isOnline = state.state !== "unavailable";
     const offlineBanner = this.shadowRoot.getElementById("offline_banner");
     const submitBtn = this.shadowRoot.getElementById("submit_btn");
-    const workModeSelect = this.shadowRoot.getElementById("work_mode");
+    const loadBtn = this.shadowRoot.getElementById("load_btn");
     if (offlineBanner) offlineBanner.style.display = isOnline ? "none" : "block";
     if (submitBtn) submitBtn.disabled = !isOnline;
-    if (workModeSelect) workModeSelect.disabled = !isOnline;
+    if (loadBtn) loadBtn.disabled = !isOnline;
 
+    // Populate work mode options (without selecting value)
     const select = this.shadowRoot.getElementById("work_mode");
     if (!select) return;
 
     const options = state.attributes.options || [];
-    const current = state.state;
-
-    if (select.options.length !== options.length) {
-      select.innerHTML = options.map(opt =>
-        `<option value="${opt}" ${opt === current ? "selected" : ""}>${opt}</option>`
-      ).join("");
-    } else {
-      select.value = current;
+    if (select.options.length !== options.length + 1) {
+      select.innerHTML = `<option value="">请选择</option>` +
+        options.map(opt => `<option value="${opt}">${opt}</option>`).join("");
     }
 
+    // Render dynamic fields
     const fields = state.attributes.energy_fields || [];
     this._renderDynamicFields(fields);
-    this._toggleFields(current);
+
+    // If data loaded, keep current values and toggle
+    if (this._dataLoaded) {
+      this._toggleFields(select.value);
+    }
   }
 
   _renderDynamicFields(fields) {
@@ -190,7 +207,7 @@ class HanchuessEnergyCard extends HTMLElement {
           <div class="${hiddenClass}" ${listenerAttr} data-signal="${field.signal}">
             <div class="field">
               <label>${field.name}</label>
-              <input type="number" data-signal="${field.signal}" min="${min}" max="${max}" value="${min}">
+              <input type="number" data-signal="${field.signal}" min="${min}" max="${max}" placeholder="[${min}, ${max}]">
             </div>
           </div>
         `;
@@ -205,9 +222,9 @@ class HanchuessEnergyCard extends HTMLElement {
             <div class="section-title">${field.name}</div>
             <div class="field">
               <div class="time-group">
-                <input type="time" data-signal="${startSignal}" value="00:00">
+                <input type="time" data-signal="${startSignal}" value="">
                 <span>—</span>
-                <input type="time" data-signal="${endSignal}" value="00:00">
+                <input type="time" data-signal="${endSignal}" value="">
               </div>
             </div>
           </div>
@@ -226,7 +243,6 @@ class HanchuessEnergyCard extends HTMLElement {
     const state = this._hass.states[this._config.entity];
     if (!state) return;
 
-    // Get current work mode numeric value from work_mode_options
     const wmOptions = state.attributes.work_mode_options || [];
     let currentValue = "";
     for (const opt of wmOptions) {
@@ -257,71 +273,175 @@ class HanchuessEnergyCard extends HTMLElement {
     });
   }
 
+  _signalToTime(val) {
+    // "1100" → "11:00", "0" → "00:00"
+    const s = String(val).padStart(4, "0");
+    return s.slice(0, 2) + ":" + s.slice(2, 4);
+  }
+
   _timeToSignal(timeStr) {
     return timeStr.replace(":", "");
   }
 
-  async _submit() {
-    const btn = this.shadowRoot.getElementById("submit_btn");
+  async _loadData() {
+    const loadBtn = this.shadowRoot.getElementById("load_btn");
     const statusMsg = this.shadowRoot.getElementById("status_msg");
-    btn.disabled = true;
-    statusMsg.textContent = "提交中...";
+    loadBtn.disabled = true;
+    statusMsg.textContent = "加载中...";
     statusMsg.className = "status";
 
-    const entityId = this._config.entity;
-    const sn = this._config.sn;
-    const workModeLabel = this.shadowRoot.getElementById("work_mode").value;
-
-    const state = this._hass.states[entityId];
+    const state = this._hass.states[this._config.entity];
     if (!state) return;
 
-    // Find work mode signal and value
-    const wmOptions = state.attributes.work_mode_options || [];
-    let wmSignal = "WORK_MODE_CMB";
-    let wmValue = "";
-    for (const opt of wmOptions) {
-      if (opt.label === workModeLabel) {
-        wmValue = String(opt.value);
-        wmSignal = opt.signal || "WORK_MODE_CMB";
-        break;
+    // Collect all signal keys from dynamic fields
+    const keys = [];
+    const fields = state.attributes.energy_fields || [];
+    for (const field of fields) {
+      if (field.signal) {
+        const signals = field.signal.split(",");
+        signals.forEach(s => { if (s) keys.push(s); });
       }
     }
 
+    // Add work mode signal
+    const wmOptions = state.attributes.work_mode_options || [];
+    if (wmOptions.length > 0) {
+      keys.push(wmOptions[0].signal || "WORK_MODE_CMB");
+    }
+
     try {
-      // Build valueMap with work mode + all visible fields
-      const valueMap = {};
-      valueMap[wmSignal] = wmValue;
+      const result = await this._hass.callWS({
+        type: "hanchuess/iot_get",
+        sn: this._config.sn,
+        dev_type: "2",
+        keys: keys,
+      });
 
-      const container = this.shadowRoot.getElementById("dynamic_fields");
-      const visibleFields = container.querySelectorAll(".dynamic-field.visible");
+      // Store original values for change detection
+      this._originalValues = { ...result };
+      this._dataLoaded = true;
 
-      visibleFields.forEach(fieldEl => {
-        const inputs = fieldEl.querySelectorAll("input");
-        inputs.forEach(input => {
-          const signal = input.dataset.signal;
-          if (signal) {
-            if (input.type === "time") {
-              valueMap[signal] = this._timeToSignal(input.value);
-            } else {
-              valueMap[signal] = input.value;
-            }
+      // Fill work mode
+      const wmSignal = wmOptions.length > 0 ? (wmOptions[0].signal || "WORK_MODE_CMB") : "WORK_MODE_CMB";
+      const wmValue = result[wmSignal];
+      if (wmValue !== undefined) {
+        const select = this.shadowRoot.getElementById("work_mode");
+        for (const opt of wmOptions) {
+          if (String(opt.value) === String(wmValue)) {
+            select.value = opt.label;
+            this._toggleFields(opt.label);
+            break;
           }
-        });
+        }
+      }
+
+      // Fill dynamic fields
+      const container = this.shadowRoot.getElementById("dynamic_fields");
+      const inputs = container.querySelectorAll("input");
+      inputs.forEach(input => {
+        const signal = input.dataset.signal;
+        if (signal && result[signal] !== undefined) {
+          if (input.type === "time") {
+            input.value = this._signalToTime(result[signal]);
+          } else {
+            input.value = result[signal];
+          }
+        }
       });
 
-      await this._hass.callService("hanchuess", "device_control", {
-        sn: sn,
-        value_map: valueMap,
-      });
-
-      statusMsg.textContent = "提交成功";
+      statusMsg.textContent = "数据加载成功";
       statusMsg.className = "status success";
     } catch (err) {
-      statusMsg.textContent = "提交失败: " + err.message;
+      statusMsg.textContent = "加载失败: " + err.message;
       statusMsg.className = "status error";
     }
 
-    btn.disabled = false;
+    loadBtn.disabled = false;
+    setTimeout(() => { statusMsg.textContent = ""; }, 3000);
+  }
+
+  async _submit() {
+    const submitBtn = this.shadowRoot.getElementById("submit_btn");
+    const statusMsg = this.shadowRoot.getElementById("status_msg");
+    submitBtn.disabled = true;
+    statusMsg.textContent = "提交中...";
+    statusMsg.className = "status";
+
+    const state = this._hass.states[this._config.entity];
+    if (!state) return;
+
+    const sn = this._config.sn;
+    const valueMap = {};
+
+    // Check work mode change
+    const wmOptions = state.attributes.work_mode_options || [];
+    const wmSignal = wmOptions.length > 0 ? (wmOptions[0].signal || "WORK_MODE_CMB") : "WORK_MODE_CMB";
+    const selectEl = this.shadowRoot.getElementById("work_mode");
+    const selectedLabel = selectEl ? selectEl.value : "";
+
+    if (selectedLabel) {
+      for (const opt of wmOptions) {
+        if (opt.label === selectedLabel) {
+          const newVal = String(opt.value);
+          if (newVal !== String(this._originalValues[wmSignal] || "")) {
+            valueMap[wmSignal] = newVal;
+          }
+          break;
+        }
+      }
+    }
+
+    // Check visible field changes
+    const container = this.shadowRoot.getElementById("dynamic_fields");
+    const visibleFields = container.querySelectorAll(".dynamic-field.visible");
+    visibleFields.forEach(fieldEl => {
+      const inputs = fieldEl.querySelectorAll("input");
+      inputs.forEach(input => {
+        const signal = input.dataset.signal;
+        if (!signal) return;
+
+        let newVal;
+        if (input.type === "time") {
+          newVal = this._timeToSignal(input.value);
+        } else {
+          newVal = input.value;
+        }
+
+        const origVal = String(this._originalValues[signal] || "");
+        if (newVal !== origVal) {
+          valueMap[signal] = newVal;
+        }
+      });
+    });
+
+    if (Object.keys(valueMap).length === 0) {
+      statusMsg.textContent = "没有修改";
+      statusMsg.className = "status";
+      submitBtn.disabled = false;
+      setTimeout(() => { statusMsg.textContent = ""; }, 2000);
+      return;
+    }
+
+    try {
+      const result = await this._hass.callWS({
+        type: "hanchuess/iot_set",
+        sn: sn,
+        dev_type: "2",
+        value: valueMap,
+      });
+
+      // Update original values
+      Object.assign(this._originalValues, valueMap);
+
+      statusMsg.textContent = "设定成功";
+      statusMsg.className = "status success";
+    } catch (err) {
+      const errMsg = err.message || err.error || "未知错误";
+      statusMsg.textContent = "设定失败: " + errMsg;
+      statusMsg.className = "status error";
+    }
+
+    submitBtn.disabled = false;
     setTimeout(() => { statusMsg.textContent = ""; }, 3000);
   }
 
