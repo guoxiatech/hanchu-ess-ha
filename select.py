@@ -85,13 +85,11 @@ def _parse_energy_menu(menu_data: dict) -> dict:
             if item_type == "6":
                 field["format"] = item.get("defFmt", "HH:mm")
 
-            # Collapsible time period (type=82/83)
-            # Auto-expand to 3 slots: signal0, signal1, signal2
-            # Signal value is JSON array: [type, charge_mode, "power", "startTime", "endTime"]
-            if item_type in ("82", "83"):
+            # Collapsible time period: has "structure" field (itemType may be 82/83/10 etc)
+            if item.get("structure"):
                 idx_map = {"charge_mode": 1, "chg_pwr_lmt": 2, "start_time": 3, "end_time": 4}
                 children = []
-                for child in item.get("structure", []) or item.get("children", []):
+                for child in item.get("structure"):
                     code = child.get("itemCode", "")
                     ct = child.get("itemType", "")
                     c = {
@@ -116,23 +114,35 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                             c["options"] = []
                     children.append(c)
 
-                # Expand to 3 slots
-                base_code = item_code.rstrip("0123456789")  # TCT_CHG0 -> TCT_CHG
-                base_name = field["name"].rstrip("0123456789").rstrip()
-                for i in range(3):
-                    slot = {
-                        "code": f"{base_code}{i}",
-                        "signal": f"{signal}{i}" if not signal[-1].isdigit() else f"{signal[:-1]}{i}",
-                        "type": "collapse",
-                        "name": f"{base_name}{i + 1}",
-                        "children": children,
-                    }
+                # Check if we need to expand (82/83 with itemCodeSignal) or use as-is (10 with individual items)
+                if item_type in ("82", "83") and item.get("itemCodeSignal"):
+                    # Expand to 3 slots
+                    base_code = item_code.rstrip("0123456789")
+                    base_name = field["name"].rstrip("0123456789").rstrip()
+                    for i in range(3):
+                        slot = {
+                            "code": f"{base_code}{i}",
+                            "signal": f"{signal}{i}" if not signal[-1].isdigit() else f"{signal[:-1]}{i}",
+                            "type": "collapse",
+                            "name": f"{base_name}{i + 1}",
+                            "children": children,
+                        }
+                        if listener:
+                            slot["listener_code"] = listener.get("code", "")
+                            slot["listener_show"] = listener.get("show", "")
+                        if item.get("hidden"):
+                            slot["hidden"] = True
+                        result["fields"].append(slot)
+                else:
+                    # Use as-is (itemType=10, already individual items)
+                    field["type"] = "collapse"
+                    field["children"] = children
                     if listener:
-                        slot["listener_code"] = listener.get("code", "")
-                        slot["listener_show"] = listener.get("show", "")
+                        field["listener_code"] = listener.get("code", "")
+                        field["listener_show"] = listener.get("show", "")
                     if item.get("hidden"):
-                        slot["hidden"] = True
-                    result["fields"].append(slot)
+                        field["hidden"] = True
+                    result["fields"].append(field)
                 continue
 
             # Listener for non-collapse fields
@@ -222,10 +232,6 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
         language = self.hass.config.language or "en"
         sn = self._entry.data["sn"]
         menu_data = await self.coordinator.client.async_get_menu(sn, language)
-        _LOGGER.info("[HANCHUESS] menu raw itemTypes for %s: %s", sn,
-                     [(it.get("itemCode"), it.get("itemType"))
-                      for grp in (list(menu_data.get("data", {}).values())[0] or {}).get("items", [])
-                      for it in grp] if menu_data.get("data") else "no data")
         parsed = _parse_energy_menu(menu_data)
         if parsed["work_mode_options"]:
             self._work_mode_options = parsed["work_mode_options"]
