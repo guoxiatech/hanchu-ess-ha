@@ -240,7 +240,7 @@ class HanchuessEnergyCard extends HTMLElement {
         html += `<div class="${cls}" ${la} data-signal="${field.signal}" data-time-group="${gk}" data-time-index="${idx}"><div class="time-row"><span class="time-label">${field.name}</span><input type="time" data-signal="${sigs[0]||""}"><span>-</span><input type="time" data-signal="${sigs[1]||""}"><button class="icon-btn del" data-action="del-time" data-group="${gk}" data-index="${idx}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${gk}" data-index="${idx}" style="display:none">+</button></div></div>`;
       }
 
-      if (field.type === "82" || field.type === "83") {
+      if (field.type === "collapse") {
         const children = field.children || [];
         const sig = field.signal;
         let switchHtml = "";
@@ -499,7 +499,7 @@ class HanchuessEnergyCard extends HTMLElement {
       keys.push(wmOptions[0].signal || "WORK_MODE_CMB");
     }
     // Only request FLAG_ENABLE_CYCLE if there are collapse (82/83) fields
-    const hasCollapse = fields.some(f => f.type === "82" || f.type === "83");
+    const hasCollapse = fields.some(f => f.type === "collapse");
     if (hasCollapse && !keys.includes("FLAG_ENABLE_CYCLE")) keys.push("FLAG_ENABLE_CYCLE");
 
     try {

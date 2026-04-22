@@ -123,7 +123,7 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                     slot = {
                         "code": f"{base_code}{i}",
                         "signal": f"{signal}{i}" if not signal[-1].isdigit() else f"{signal[:-1]}{i}",
-                        "type": item_type,
+                        "type": "collapse",
                         "name": f"{base_name}{i + 1}",
                         "children": children,
                     }
