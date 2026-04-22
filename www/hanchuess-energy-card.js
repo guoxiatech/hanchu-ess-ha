@@ -243,18 +243,18 @@ class HanchuessEnergyCard extends HTMLElement {
         let bodyHtml = "";
         for (const c of children) {
           const ci = c.index != null ? c.index : 0;
-          if (c.type === "4") {
-            switchHtml = `<span class="collapse-sw-label">${c.name}</span><label class="toggle"><input type="checkbox" data-arr-signal="${sig}" data-arr-index="${ci}" data-on="${c.onVal||"1"}" data-off="${c.offVal||"0"}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
-          } else if (c.type === "6") {
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="time" data-arr-signal="${sig}" data-arr-index="${ci}" data-arr-fmt="time"><span style="color:var(--secondary-text-color)">-</span><input type="time" data-arr-signal="${sig}" data-arr-index="${ci + 1}" data-arr-fmt="time"></div>`;
+          if (c.type === "3") {
+            const opts = (c.options||[]).map(o => `<option value="${o.value}">${o.name}</option>`).join("");
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><select data-arr-signal="${sig}" data-arr-index="${ci}">${opts}</select></div>`;
+          } else if (c.type === "5") {
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="time" data-arr-signal="${sig}" data-arr-index="${ci}" data-arr-fmt="time"></div>`;
           } else if (c.type === "1") {
             const mn = c.min||"0", mx = c.max||"99999";
             bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="number" data-arr-signal="${sig}" data-arr-index="${ci}" min="${mn}" max="${mx}" placeholder="[${mn}, ${mx}]"></div>`;
-          } else if (c.type === "3") {
-            const opts = (c.options||[]).map(o => `<option value="${o.value}">${o.name}</option>`).join("");
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><select data-arr-signal="${sig}" data-arr-index="${ci}">${opts}</select></div>`;
           }
         }
+        // "是否应用" from FLAG_ENABLE_CYCLE, not from array
+        switchHtml = `<span class="collapse-sw-label">是否应用</span><label class="toggle"><input type="checkbox" data-enable-signal="${field.code}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
         html += `<div class="${cls}" ${la} data-signal="${sig}" data-collapse="${field.code}"><div class="collapse-card"><div class="collapse-header"><span class="collapse-arrow" data-arrow="${field.code}" data-toggle="${field.code}">▶</span><span class="collapse-title" data-toggle="${field.code}">${field.name}</span>${switchHtml}</div><div class="collapse-body" data-body="${field.code}">${bodyHtml}</div></div></div>`;
       }
     }
@@ -487,7 +487,9 @@ class HanchuessEnergyCard extends HTMLElement {
     if (wmOptions.length > 0) {
       keys.push(wmOptions[0].signal || "WORK_MODE_CMB");
     }
-    if (!keys.includes("FLAG_ENABLE_CYCLE")) keys.push("FLAG_ENABLE_CYCLE");
+    // Only request FLAG_ENABLE_CYCLE if there are collapse (82/83) fields
+    const hasCollapse = fields.some(f => f.type === "82" || f.type === "83");
+    if (hasCollapse && !keys.includes("FLAG_ENABLE_CYCLE")) keys.push("FLAG_ENABLE_CYCLE");
 
     try {
       const result = await this._hass.callWS({
@@ -520,7 +522,17 @@ class HanchuessEnergyCard extends HTMLElement {
         const signal = input.dataset.signal;
         if (signal && result[signal] !== undefined) {
           if (input.type === "time") {
-            input.value = this._signalToTime(result[signal]);
+            const v = String(result[signal]);
+            if (v.includes(":")) {
+              input.value = v;
+            } else if (v.length <= 4) {
+              const s = v.padStart(4, "0");
+              input.value = s.slice(0,2) + ":" + s.slice(2,4);
+            } else {
+              input.value = this._signalToTime(result[signal]);
+            }
+          } else if (input.type === "checkbox") {
+            input.checked = String(result[signal]) === (input.dataset.on || "1");
           } else if (signal === "MIN_THRESH_CHG_DUR") {
             input.value = Math.round(Number(result[signal]) / 60);
           } else {
@@ -553,6 +565,19 @@ class HanchuessEnergyCard extends HTMLElement {
           el.value = String(val);
         } else {
           el.value = String(val).replace(/"/g, "");
+        }
+      });
+
+      // Fill collapse card expand state from FLAG_ENABLE_CYCLE
+      let enableCycle = [];
+      try { enableCycle = JSON.parse(result["FLAG_ENABLE_CYCLE"] || "[]"); } catch {}
+      container.querySelectorAll("[data-enable-signal]").forEach(sw => {
+        const code = sw.dataset.enableSignal;
+        // TCT_CHG0->0, TCT_CHG1->1, TCT_CHG2->2, TCT_DISCHG0->3...
+        const m = code.match(/TCT_(CHG|DISCHG)(\d)/);
+        if (m && enableCycle.length) {
+          const ci = m[1] === "CHG" ? Number(m[2]) : 3 + Number(m[2]);
+          sw.checked = enableCycle[ci] === 1;
         }
       });
 
@@ -636,25 +661,23 @@ class HanchuessEnergyCard extends HTMLElement {
 
     // First pass: find changed signals (for non-collapse fields)
     visibleFields.forEach(fieldEl => {
-      if (fieldEl.dataset.collapse) return; // skip collapse cards, handled separately
+      if (fieldEl.dataset.collapse) return;
       const inputs = fieldEl.querySelectorAll("input[data-signal], select[data-signal]");
       inputs.forEach(input => {
         const signal = input.dataset.signal;
         if (!signal) return;
-
         let newVal;
         if (input.type === "time") {
           newVal = this._timeToSignal(input.value || "00:00");
+        } else if (input.type === "checkbox") {
+          newVal = input.checked ? (input.dataset.on || "1") : (input.dataset.off || "0");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           newVal = String(Number(input.value) * 60);
         } else {
           newVal = input.value;
         }
-
         const origVal = String(this._originalValues[signal] || "");
-        if (newVal !== origVal) {
-          changedSignals.add(signal);
-        }
+        if (newVal !== origVal) changedSignals.add(signal);
       });
     });
 
@@ -672,18 +695,16 @@ class HanchuessEnergyCard extends HTMLElement {
       }
     });
 
-    // Second pass: collect values, pair time fields together
+    // Second pass: collect non-collapse values
     visibleFields.forEach(fieldEl => {
+      if (fieldEl.dataset.collapse) return;
       const inputs = fieldEl.querySelectorAll("input[data-signal], select[data-signal]");
       const fieldSignals = Array.from(inputs).map(i => i.dataset.signal).filter(Boolean);
-
       const hasChange = fieldSignals.some(s => changedSignals.has(s));
       if (!hasChange) return;
-
       inputs.forEach(input => {
         const signal = input.dataset.signal;
         if (!signal) return;
-
         if (input.type === "time") {
           valueMap[signal] = this._timeToSignal(input.value || "00:00");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
@@ -777,24 +798,19 @@ class HanchuessEnergyCard extends HTMLElement {
   }
 
   _collectEnableCycle(container, valueMap) {
-    // FLAG_ENABLE_CYCLE = [chg0,chg1,chg2,dischg0,dischg1,dischg2]
+    if (!this._originalValues["FLAG_ENABLE_CYCLE"]) return;
     let origCycle;
-    try { origCycle = JSON.parse(this._originalValues["FLAG_ENABLE_CYCLE"] || "[0,0,0,0,0,0]"); } catch { origCycle = [0,0,0,0,0,0]; }
+    try { origCycle = JSON.parse(this._originalValues["FLAG_ENABLE_CYCLE"]); } catch { return; }
     const newCycle = [...origCycle];
-    container.querySelectorAll("[data-collapse-switch]").forEach(sw => {
-      const sig = sw.dataset.arrSignal;
-      if (!sig) return;
-      // Determine cycle index from signal name: TCT_CHG0->0, TCT_CHG1->1, TCT_CHG2->2, TCT_DISCHG0->3...
-      const m = sig.match(/TCT_(CHG|DISCHG)(\d)/);
+    container.querySelectorAll("[data-enable-signal]").forEach(sw => {
+      const code = sw.dataset.enableSignal;
+      const m = code.match(/TCT_(CHG|DISCHG)(\d)/);
       if (!m) return;
       const ci = m[1] === "CHG" ? Number(m[2]) : 3 + Number(m[2]);
       newCycle[ci] = sw.checked ? 1 : 0;
     });
     const newStr = JSON.stringify(newCycle);
-    const origStr = JSON.stringify(origCycle);
-    if (newStr !== origStr) {
-      valueMap["FLAG_ENABLE_CYCLE"] = newStr;
-    }
+    if (newStr !== JSON.stringify(origCycle)) valueMap["FLAG_ENABLE_CYCLE"] = newStr;
   }
 
   getCardSize() {

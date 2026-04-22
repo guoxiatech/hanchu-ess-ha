@@ -24,15 +24,25 @@ def _parse_energy_menu(menu_data: dict) -> dict:
     """Parse energy menu into structured data for card."""
     result = {"work_mode_options": [], "fields": []}
 
-    energy = menu_data.get("data", {}).get("energy", {})
+    data = menu_data.get("data", {})
+    # Find energy menu: try "energy" first, then look for key containing "energy"
+    energy = data.get("energy")
+    if not energy:
+        for key, val in data.items():
+            if isinstance(val, dict) and "energy" in key:
+                energy = val
+                break
+    if not energy:
+        return result
+
     for group in energy.get("items", []):
         for item in group:
             item_type = item.get("itemType")
             item_code = item.get("itemCode")
-            signal = item.get("itemCodeSignal", "")
+            signal = item.get("itemCodeSignal") or item.get("itemCode", "")
 
-            # Work mode (select)
-            if item_code == "work_mode" and item_type == "3":
+            # Work mode (select) - match by itemCode "work_mode" or "WORK_MODE_CMB"
+            if item_code in ("work_mode", "WORK_MODE_CMB") and item_type == "3":
                 try:
                     options = json.loads(item.get("optVal", "[]"))
                     result["work_mode_options"] = [
@@ -73,30 +83,36 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                 field["format"] = item.get("defFmt", "HH:mm")
 
             # Collapsible time period (type=82/83)
-            # Signal value is a JSON array string: [mode, enabled, "power", "startTime", "endTime"]
+            # Signal value is JSON array: [type, charge_mode, "power", "startTime", "endTime"]
+            # or for discharge (83): [type, 0, "power", "startTime", "endTime"]
             if item_type in ("82", "83"):
+                idx_map = {"charge_mode": 1, "chg_pwr_lmt": 2, "start_time": 3, "end_time": 4}
                 children = []
-                for child in item.get("children", []):
-                    c = {
-                        "code": child.get("itemCode", ""),
-                        "type": child.get("itemType", ""),
-                        "name": child.get("itemName", ""),
-                        "index": child.get("index", 0),
-                    }
+                for child in item.get("structure", []) or item.get("children", []):
+                    code = child.get("itemCode", "")
                     ct = child.get("itemType", "")
+                    c = {
+                        "code": code,
+                        "type": ct,
+                        "name": child.get("itemName", ""),
+                        "index": idx_map.get(code, 0),
+                    }
                     if ct == "1":
-                        c["min"] = child.get("minVal", "")
-                        c["max"] = child.get("maxVal", "")
+                        dv = child.get("defVal", "")
+                        try:
+                            bounds = json.loads(dv) if dv else []
+                            c["min"] = str(bounds[0]) if len(bounds) > 0 else child.get("minVal", "0")
+                            c["max"] = str(bounds[1]) if len(bounds) > 1 else child.get("maxVal", "99999")
+                        except (json.JSONDecodeError, ValueError):
+                            c["min"] = child.get("minVal", "0")
+                            c["max"] = child.get("maxVal", "99999")
                     if ct == "3":
                         try:
                             c["options"] = json.loads(child.get("optVal", "[]"))
                         except (json.JSONDecodeError, KeyError):
                             c["options"] = []
-                    if ct == "4":
-                        c["onVal"] = child.get("onVal")
-                        c["offVal"] = child.get("offVal")
-                    if ct == "6":
-                        c["format"] = child.get("defFmt", "HH:mm")
+                    if ct in ("5", "6"):
+                        c["type"] = "5"
                     children.append(c)
                 field["children"] = children
 
