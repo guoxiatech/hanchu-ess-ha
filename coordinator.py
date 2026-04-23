@@ -8,7 +8,7 @@ from .api import HanchuessApiClient
 
 _LOGGER = logging.getLogger(__name__)
 
-REALTIME_INTERVAL = timedelta(seconds=30)
+REALTIME_INTERVAL = timedelta(seconds=60)
 STATISTICS_INTERVAL = timedelta(minutes=5)
 
 

@@ -34,11 +34,14 @@
       "pv_power": { "name": "PV Power" },
       "grid_power": { "name": "Grid Power" },
       "load_power": { "name": "Load Power" },
+      "dg_power": { "name": "Generator Power" },
+      "daily_load_energy": { "name": "Daily Load Energy" },
       "daily_pv_energy": { "name": "Daily PV Energy" },
       "daily_charge_energy": { "name": "Daily Charge Energy" },
       "daily_discharge_energy": { "name": "Daily Discharge Energy" },
       "daily_grid_import": { "name": "Daily Grid Import" },
-      "daily_grid_export": { "name": "Daily Grid Export" }
+      "daily_grid_export": { "name": "Daily Grid Export" },
+      "daily_dg_energy": { "name": "Daily Generator Energy" }
     },
     "select": {
       "work_mode": { "name": "Work Mode" }

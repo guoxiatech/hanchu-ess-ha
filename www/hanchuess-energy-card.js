@@ -74,51 +74,12 @@ const HANCHUESS_I18N = {
     card_name: "Hanchuess 储能设置",
     card_desc: "Hanchuess 逆变器储能设置卡片",
   },
-  "zh-Hant": {
-    device: "設備",
-    select_device: "請選擇設備",
-    energy_settings: "儲能設置",
-    quick_charge: "快速充放電",
-    mode: "模式",
-    charge: "充電",
-    discharge: "放電",
-    stop: "停止",
-    duration_min: "時長(分)",
-    confirm: "確認",
-    cancel: "取消",
-    work_mode: "工作模式",
-    please_select: "請選擇",
-    load_data: "獲取數據",
-    submit: "設定",
-    offline: "設備離線，無法設置",
-    loading: "載入中...",
-    load_success: "數據載入成功",
-    load_fail: "載入失敗: ",
-    submitting: "提交中...",
-    submit_success: "設定成功",
-    submit_fail: "設定失敗: ",
-    no_change: "沒有修改",
-    unknown_error: "未知錯誤",
-    duration_range: "時長需在 1~1440 分鐘之間",
-    cmd_sent: "指令已發送",
-    fail_prefix: "失敗: ",
-    stopping: "停止中...",
-    stopped: "已停止",
-    apply: "是否應用",
-    fast_charging: "充電中",
-    fast_discharging: "放電中",
-    remaining: "剩餘",
-    card_name: "Hanchuess 儲能設置",
-    card_desc: "Hanchuess 逆變器儲能設置卡片",
-  },
 };
+
 
 function _hassLang(hass) {
   const lang = (hass && hass.language) || "en";
-  if (lang.startsWith("zh")) {
-    return lang.includes("Hant") || lang.includes("TW") || lang.includes("HK") ? "zh-Hant" : "zh-Hans";
-  }
-  return "en";
+  return lang.startsWith("zh") ? "zh-Hans" : "en";
 }
 
 function _t(hass, key) {
@@ -227,17 +188,25 @@ class HanchuessEnergyCard extends HTMLElement {
         .quick-status.error { color: var(--error-color); }
         .quick-status.success { color: var(--success-color, #4caf50); }
         .quick-running {
-          background: var(--primary-color); color: white; padding: 8px 12px;
-          border-radius: 4px; font-size: 13px; margin-bottom: 8px;
-          display: none; align-items: center; justify-content: space-between;
+          background: var(--card-background-color); border: 1px solid var(--divider-color);
+          border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+          display: none; flex-direction: column; gap: 6px;
         }
-        .quick-running .stop-btn {
-          background: rgba(255,255,255,0.25); border: none; color: white;
-          width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        .quick-running .stop-row {
+          display: flex; align-items: center; gap: 8px; cursor: pointer;
         }
-        .quick-running .stop-btn:hover { background: rgba(255,255,255,0.4); }
-        .quick-running .stop-btn svg { width: 16px; height: 16px; fill: white; }
+        .quick-running .stop-row .stop-icon {
+          width: 20px; height: 20px; flex-shrink: 0;
+        }
+        .quick-running .stop-row .stop-label {
+          font-size: 14px; font-weight: 500; color: var(--primary-text-color);
+        }
+        .quick-running .remain-info {
+          font-size: 13px; color: var(--secondary-text-color);
+        }
+        .quick-running .remain-time {
+          font-size: 20px; font-weight: 600; color: var(--primary-color);
+        }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .title { font-size: 18px; font-weight: 500; }
         .header-btns { display: flex; gap: 8px; }
@@ -316,10 +285,12 @@ class HanchuessEnergyCard extends HTMLElement {
             <input type="number" id="quick_duration" min="1" max="1440" value="30" placeholder="1~1440">
           </div>
           <div class="quick-running" id="quick_running">
-            <span id="quick_running_text"></span>
-            <button class="stop-btn" id="quick_stop_btn" title="${_t(this._hass, 'stop')}">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="white" stroke-width="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
-            </button>
+            <div class="stop-row" id="quick_stop_btn">
+              <svg class="stop-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="var(--primary-color)" stroke-width="2"/><rect x="7" y="7" width="10" height="10" rx="1" fill="var(--primary-color)"/></svg>
+              <span class="stop-label" id="quick_stop_label"></span>
+            </div>
+            <div class="remain-info" id="quick_remain_label"></div>
+            <div class="remain-time" id="quick_remain_time"></div>
           </div>
           <div class="quick-btns" id="quick_btns">
             <button class="btn btn-submit" id="quick_confirm">${_t(this._hass, 'confirm')}</button>
@@ -390,25 +361,38 @@ class HanchuessEnergyCard extends HTMLElement {
     const quickDuration = this.shadowRoot.getElementById("quick_duration");
     const quickBtns = this.shadowRoot.getElementById("quick_btns");
     const quickRunning = this.shadowRoot.getElementById("quick_running");
-    const quickRunningText = this.shadowRoot.getElementById("quick_running_text");
+    const quickRows = this.shadowRoot.querySelectorAll(".quick-row");
 
     const fastStatus = Number(state.attributes.fast_chg_status || 0);
-    const fastRemain = Number(state.attributes.fast_chg_remain || 0);
-    const isRunning = fastStatus === 1 || fastStatus === 2;
+    const serverRemain = Number(state.attributes.fast_chg_remain || 0);
+    const isRunning = this._localFastStatus ? true : (fastStatus === 1 || fastStatus === 2);
+    const curStatus = this._localFastStatus || fastStatus;
 
-    if (isRunning && quickRunning && quickRunningText) {
-      const label = fastStatus === 1 ? _t(this._hass, 'fast_charging') : _t(this._hass, 'fast_discharging');
-      const min = Math.floor(fastRemain / 60);
-      const sec = fastRemain % 60;
-      const timeStr = min > 0 ? `${min}m${String(sec).padStart(2, '0')}s` : `${sec}s`;
-      quickRunningText.textContent = `${label} \u00b7 ${_t(this._hass, 'remaining')} ${timeStr}`;
+    if (serverRemain > 0 && (fastStatus === 1 || fastStatus === 2)) {
+      this._localRemainSec = serverRemain;
+      this._localFastStatus = fastStatus;
+    }
+
+    const remainMin = Math.ceil((this._localRemainSec || serverRemain) / 60);
+
+    if (isRunning && quickRunning) {
+      const stopLabel = this.shadowRoot.getElementById("quick_stop_label");
+      const remainLabel = this.shadowRoot.getElementById("quick_remain_label");
+      const remainTime = this.shadowRoot.getElementById("quick_remain_time");
+      const isChg = curStatus === 1;
+      if (stopLabel) stopLabel.textContent = isChg ? `${_t(this._hass, 'stop')} ${_t(this._hass, 'charge')}` : `${_t(this._hass, 'stop')} ${_t(this._hass, 'discharge')}`;
+      if (remainLabel) remainLabel.textContent = isChg ? `${_t(this._hass, 'remaining')} ${_t(this._hass, 'fast_charging')}...` : `${_t(this._hass, 'remaining')} ${_t(this._hass, 'fast_discharging')}...`;
+      if (remainTime) remainTime.textContent = `${remainMin}min`;
       quickRunning.style.display = "flex";
       if (quickBtns) quickBtns.style.display = "none";
-      if (quickMode) quickMode.disabled = true;
-      if (quickDuration) quickDuration.disabled = true;
+      quickRows.forEach(r => r.style.display = "none");
     } else {
+      this._localFastStatus = 0;
+      this._localRemainSec = 0;
+      if (this._localCountdown) { clearInterval(this._localCountdown); this._localCountdown = null; }
       if (quickRunning) quickRunning.style.display = "none";
       if (quickBtns) quickBtns.style.display = "flex";
+      quickRows.forEach(r => r.style.display = "flex");
       const canOperate = isOnline && !isRunning;
       if (quickConfirm) quickConfirm.disabled = !canOperate;
       if (quickMode) quickMode.disabled = !canOperate;
@@ -1145,8 +1129,21 @@ class HanchuessEnergyCard extends HTMLElement {
         act: Number(mode),
         duration: Number(duration) * 60,
       });
-      statusEl.textContent = _t(this._hass, 'cmd_sent');
-      statusEl.className = "quick-status success";
+      statusEl.textContent = "";
+      this._localFastStatus = Number(mode) === 2 ? 1 : 2;
+      this._localRemainSec = Number(duration) * 60;
+      if (this._localCountdown) clearInterval(this._localCountdown);
+      this._localCountdown = setInterval(() => {
+        this._localRemainSec -= 60;
+        if (this._localRemainSec <= 0) {
+          this._localRemainSec = 0;
+          this._localFastStatus = 0;
+          clearInterval(this._localCountdown);
+          this._localCountdown = null;
+        }
+        this._updateStatus();
+      }, 60000);
+      this._updateStatus();
     } catch (err) {
       statusEl.textContent = _t(this._hass, 'fail_prefix') + (err.message || _t(this._hass, 'unknown_error'));
       statusEl.className = "quick-status error";
@@ -1158,13 +1155,12 @@ class HanchuessEnergyCard extends HTMLElement {
   async _quickStop() {
     const statusEl = this.shadowRoot.getElementById("quick_status");
     const stopBtn = this.shadowRoot.getElementById("quick_stop_btn");
-    if (stopBtn) stopBtn.disabled = true;
+    if (stopBtn) stopBtn.style.pointerEvents = "none";
     statusEl.textContent = _t(this._hass, 'stopping');
     statusEl.className = "quick-status";
 
-    const state = this._hass.states[this._config.entity];
-    const fastStatus = Number(state && state.attributes.fast_chg_status || 0);
-    const stopAct = fastStatus === 2 ? -3 : -2;
+    const curStatus = this._localFastStatus || Number((this._hass.states[this._config.entity] || {}).attributes?.fast_chg_status || 0);
+    const stopAct = curStatus === 2 ? -3 : -2;
     try {
       await this._hass.callWS({
         type: "hanchuess/fast_charge",
@@ -1172,13 +1168,17 @@ class HanchuessEnergyCard extends HTMLElement {
         act: stopAct,
         duration: 0,
       });
+      this._localFastStatus = 0;
+      this._localRemainSec = 0;
+      if (this._localCountdown) { clearInterval(this._localCountdown); this._localCountdown = null; }
+      this._updateStatus();
       statusEl.textContent = _t(this._hass, 'stopped');
       statusEl.className = "quick-status success";
     } catch (err) {
       statusEl.textContent = _t(this._hass, 'fail_prefix') + (err.message || _t(this._hass, 'unknown_error'));
       statusEl.className = "quick-status error";
     }
-    if (stopBtn) stopBtn.disabled = false;
+    if (stopBtn) stopBtn.style.pointerEvents = "";
     setTimeout(() => { statusEl.textContent = ""; }, 3000);
   }
 
