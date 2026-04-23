@@ -7,5 +7,6 @@
   "codeowners": [],
   "version": "1.0.0",
   "iot_class": "cloud_polling",
-  "config_flow": true
+  "config_flow": true,
+  "integration_type": "device"
 }

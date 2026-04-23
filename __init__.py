@@ -38,6 +38,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     # Register websocket commands
     websocket_api.async_register_command(hass, ws_iot_get)
     websocket_api.async_register_command(hass, ws_iot_set)
+    websocket_api.async_register_command(hass, ws_fast_charge)
 
     return True
 
@@ -99,6 +100,35 @@ async def ws_iot_set(hass, connection, msg):
         connection.send_result(msg["id"], result.get("data", {}))
     else:
         connection.send_error(msg["id"], "control_failed", result.get("msg", "Unknown error"))
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "hanchuess/fast_charge",
+    vol.Required("sn"): str,
+    vol.Required("act"): vol.All(int, vol.Range(min=-3, max=3)),
+    vol.Required("duration"): vol.All(int, vol.Range(min=0)),
+})
+@websocket_api.async_response
+async def ws_fast_charge(hass, connection, msg):
+    """Handle fast charge/discharge websocket command."""
+    sn = msg["sn"]
+
+    target_client = None
+    for eid, data in hass.data[DOMAIN].items():
+        if isinstance(data, dict) and "realtime" in data:
+            if data["realtime"].entry.data.get("sn") == sn:
+                target_client = data["realtime"].client
+                break
+
+    if not target_client:
+        connection.send_error(msg["id"], "not_found", f"Device {sn} not found")
+        return
+
+    result = await target_client.async_fast_charge_discharge(sn, msg["act"], msg["duration"])
+    if result.get("success"):
+        connection.send_result(msg["id"], result.get("data", {}))
+    else:
+        connection.send_error(msg["id"], "fast_charge_failed", result.get("msg", "Unknown error"))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

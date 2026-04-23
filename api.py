@@ -139,6 +139,21 @@ class HanchuessApiClient:
             return result.get("data", {})
         return {}
 
+    async def async_fast_charge_discharge(self, sn: str, act: int, duration: int) -> dict:
+        result = await self._request(
+            "/gateway/app/ha/fastChargeDischarge",
+            {"sn": sn, "act": act, "duration": duration},
+        )
+        if not result:
+            return {"success": False, "msg": "Request failed"}
+        if result.get("code") == 401:
+            return {"success": False, "msg": "token_expired"}
+        if result.get("code") == 100:
+            return {"success": False, "msg": result.get("msg", "Device error")}
+        if result.get("success"):
+            return {"success": True, "data": result.get("data", {})}
+        return {"success": False, "msg": result.get("msg", "Unknown error")}
+
     async def async_device_control(self, sn: str, dev_type: str, value: dict) -> dict:
         result = await self._request(
             "/gateway/app/ha/iotSet",

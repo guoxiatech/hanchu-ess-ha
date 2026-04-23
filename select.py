@@ -192,11 +192,18 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def extra_state_attributes(self):
-        return {
+        fast_chg = self.coordinator.data.get("deviceStatusOfTestFastChg")
+        remain = self.coordinator.data.get("testTimeRemain")
+        attrs = {
             "sn": self._entry.data["sn"],
             "energy_fields": self._energy_fields,
             "work_mode_options": self._work_mode_options,
         }
+        if fast_chg is not None:
+            attrs["fast_chg_status"] = fast_chg
+        if remain is not None:
+            attrs["fast_chg_remain"] = remain
+        return attrs
 
     @property
     def available(self) -> bool:

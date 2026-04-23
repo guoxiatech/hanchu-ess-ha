@@ -1,3 +1,131 @@
+// ===== i18n =====
+const HANCHUESS_I18N = {
+  en: {
+    device: "Device",
+    select_device: "Select device",
+    energy_settings: "Energy Settings",
+    quick_charge: "Quick Charge/Discharge",
+    mode: "Mode",
+    charge: "Charge",
+    discharge: "Discharge",
+    stop: "Stop",
+    duration_min: "Duration(min)",
+    confirm: "Confirm",
+    cancel: "Cancel",
+    work_mode: "Work Mode",
+    please_select: "Please select",
+    load_data: "Load",
+    submit: "Set",
+    offline: "Device offline, cannot configure",
+    loading: "Loading...",
+    load_success: "Data loaded",
+    load_fail: "Load failed: ",
+    submitting: "Submitting...",
+    submit_success: "Set successfully",
+    submit_fail: "Set failed: ",
+    no_change: "No changes",
+    unknown_error: "Unknown error",
+    duration_range: "Duration must be 1~1440 min",
+    cmd_sent: "Command sent",
+    fail_prefix: "Failed: ",
+    stopping: "Stopping...",
+    stopped: "Stopped",
+    apply: "Apply",
+    fast_charging: "Charging",
+    fast_discharging: "Discharging",
+    remaining: "remaining",
+    card_name: "Hanchuess Energy Settings",
+    card_desc: "Hanchuess inverter energy settings card",
+  },
+  "zh-Hans": {
+    device: "设备",
+    select_device: "请选择设备",
+    energy_settings: "储能设置",
+    quick_charge: "快速充放电",
+    mode: "模式",
+    charge: "充电",
+    discharge: "放电",
+    stop: "停止",
+    duration_min: "时长(分)",
+    confirm: "确认",
+    cancel: "取消",
+    work_mode: "工作模式",
+    please_select: "请选择",
+    load_data: "获取数据",
+    submit: "设定",
+    offline: "设备离线，无法设置",
+    loading: "加载中...",
+    load_success: "数据加载成功",
+    load_fail: "加载失败: ",
+    submitting: "提交中...",
+    submit_success: "设定成功",
+    submit_fail: "设定失败: ",
+    no_change: "没有修改",
+    unknown_error: "未知错误",
+    duration_range: "时长需在 1~1440 分钟之间",
+    cmd_sent: "指令已发送",
+    fail_prefix: "失败: ",
+    stopping: "停止中...",
+    stopped: "已停止",
+    apply: "是否应用",
+    fast_charging: "充电中",
+    fast_discharging: "放电中",
+    remaining: "剩余",
+    card_name: "Hanchuess 储能设置",
+    card_desc: "Hanchuess 逆变器储能设置卡片",
+  },
+  "zh-Hant": {
+    device: "設備",
+    select_device: "請選擇設備",
+    energy_settings: "儲能設置",
+    quick_charge: "快速充放電",
+    mode: "模式",
+    charge: "充電",
+    discharge: "放電",
+    stop: "停止",
+    duration_min: "時長(分)",
+    confirm: "確認",
+    cancel: "取消",
+    work_mode: "工作模式",
+    please_select: "請選擇",
+    load_data: "獲取數據",
+    submit: "設定",
+    offline: "設備離線，無法設置",
+    loading: "載入中...",
+    load_success: "數據載入成功",
+    load_fail: "載入失敗: ",
+    submitting: "提交中...",
+    submit_success: "設定成功",
+    submit_fail: "設定失敗: ",
+    no_change: "沒有修改",
+    unknown_error: "未知錯誤",
+    duration_range: "時長需在 1~1440 分鐘之間",
+    cmd_sent: "指令已發送",
+    fail_prefix: "失敗: ",
+    stopping: "停止中...",
+    stopped: "已停止",
+    apply: "是否應用",
+    fast_charging: "充電中",
+    fast_discharging: "放電中",
+    remaining: "剩餘",
+    card_name: "Hanchuess 儲能設置",
+    card_desc: "Hanchuess 逆變器儲能設置卡片",
+  },
+};
+
+function _hassLang(hass) {
+  const lang = (hass && hass.language) || "en";
+  if (lang.startsWith("zh")) {
+    return lang.includes("Hant") || lang.includes("TW") || lang.includes("HK") ? "zh-Hant" : "zh-Hans";
+  }
+  return "en";
+}
+
+function _t(hass, key) {
+  const lang = _hassLang(hass);
+  return (HANCHUESS_I18N[lang] && HANCHUESS_I18N[lang][key]) || HANCHUESS_I18N["en"][key] || key;
+}
+
 // ===== Card Editor =====
 class HanchuessEnergyCardEditor extends HTMLElement {
   setConfig(config) {
@@ -18,12 +146,12 @@ class HanchuessEnergyCardEditor extends HTMLElement {
 
     this.innerHTML = `
       <div style="padding: 16px;">
-        <label style="font-weight:500;display:block;margin-bottom:8px;">设备</label>
+        <label style="font-weight:500;display:block;margin-bottom:8px;">${_t(this._hass, 'device')}</label>
         <select id="entity_select" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
-          <option value="">请选择设备</option>
+          <option value="">${_t(this._hass, 'select_device')}</option>
           ${entities.map(eid => {
             const state = this._hass.states[eid];
-            const name = (state.attributes.friendly_name || eid).replace(" 工作模式", "");
+            const name = (state.attributes.friendly_name || eid).replace(/ 工作模式| Work Mode/g, "");
             const selected = this._config.entity === eid ? "selected" : "";
             return `<option value="${eid}" ${selected}>${name}</option>`;
           }).join("")}
@@ -84,9 +212,27 @@ class HanchuessEnergyCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card { padding: 16px; }
+        .sn-bar { font-size: 16px; font-weight: 500; margin-bottom: 16px; color: var(--primary-color); }
+        .quick-section { border: 1px solid var(--divider-color); border-radius: 6px; padding: 12px; margin-bottom: 16px; }
+        .quick-title { font-size: 14px; font-weight: 500; margin-bottom: 10px; color: var(--primary-color); }
+        .quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .quick-row label { min-width: 60px; font-size: 13px; color: var(--secondary-text-color); white-space: nowrap; }
+        .quick-row select, .quick-row input {
+          flex: 1; padding: 8px; border: 1px solid var(--divider-color);
+          border-radius: 4px; background: var(--card-background-color);
+          color: var(--primary-text-color); font-size: 14px; box-sizing: border-box;
+        }
+        .quick-btns { display: flex; gap: 8px; justify-content: flex-end; }
+        .quick-status { font-size: 12px; margin-top: 6px; text-align: center; }
+        .quick-status.error { color: var(--error-color); }
+        .quick-status.success { color: var(--success-color, #4caf50); }
+        .quick-running {
+          background: var(--primary-color); color: white; padding: 6px 10px;
+          border-radius: 4px; font-size: 13px; text-align: center; margin-bottom: 8px;
+          display: none;
+        }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .title { font-size: 18px; font-weight: 500; }
-        .title .sn { color: var(--primary-color); font-size: 14px; }
         .header-btns { display: flex; gap: 8px; }
         .btn {
           padding: 6px 16px; border: none; border-radius: 4px;
@@ -145,18 +291,43 @@ class HanchuessEnergyCard extends HTMLElement {
         .toggle input:checked + .slider::before { transform: translateX(18px); }
       </style>
       <ha-card>
+        <div class="sn-bar" id="device_sn"></div>
+        <div id="offline_banner" class="offline-banner" style="display:none">${_t(this._hass, 'offline')}</div>
+
+        <!-- 快速充放电 -->
+        <div class="quick-section" id="quick_section">
+          <div class="quick-title">${_t(this._hass, 'quick_charge')}</div>
+          <div class="quick-row">
+            <label>${_t(this._hass, 'mode')}</label>
+            <select id="quick_mode">
+              <option value="2">${_t(this._hass, 'charge')}</option>
+              <option value="3">${_t(this._hass, 'discharge')}</option>
+            </select>
+          </div>
+          <div class="quick-row">
+            <label>${_t(this._hass, 'duration_min')}</label>
+            <input type="number" id="quick_duration" min="1" max="1440" value="60" placeholder="1~1440">
+          </div>
+          <div class="quick-running" id="quick_running"></div>
+          <div class="quick-btns">
+            <button class="btn" id="quick_cancel" style="background:var(--divider-color);color:var(--primary-text-color);">${_t(this._hass, 'cancel')}</button>
+            <button class="btn btn-submit" id="quick_confirm">${_t(this._hass, 'confirm')}</button>
+          </div>
+          <div class="quick-status" id="quick_status"></div>
+        </div>
+
+        <!-- 储能设置 -->
         <div class="header">
-          <div class="title">储能设置 <span id="device_sn" class="sn"></span></div>
+          <div class="title">${_t(this._hass, 'energy_settings')}</div>
           <div class="header-btns">
-            <button class="btn btn-load" id="load_btn">获取数据</button>
-            <button class="btn btn-submit" id="submit_btn">设定</button>
+            <button class="btn btn-load" id="load_btn">${_t(this._hass, 'load_data')}</button>
+            <button class="btn btn-submit" id="submit_btn">${_t(this._hass, 'submit')}</button>
           </div>
         </div>
-        <div id="offline_banner" class="offline-banner" style="display:none">设备离线，无法设置</div>
 
         <div class="field">
-          <label>工作模式</label>
-          <select id="work_mode"><option value="">请选择</option></select>
+          <label>${_t(this._hass, 'work_mode')}</label>
+          <select id="work_mode"><option value="">${_t(this._hass, 'please_select')}</option></select>
         </div>
 
         <div id="dynamic_fields"></div>
@@ -176,6 +347,14 @@ class HanchuessEnergyCard extends HTMLElement {
     this.shadowRoot.getElementById("submit_btn").addEventListener("click", () => {
       this._submit();
     });
+
+    this.shadowRoot.getElementById("quick_confirm").addEventListener("click", () => {
+      this._quickChargeDischarge();
+    });
+
+    this.shadowRoot.getElementById("quick_cancel").addEventListener("click", () => {
+      this._quickStop();
+    });
   }
 
   _updateStatus() {
@@ -185,7 +364,7 @@ class HanchuessEnergyCard extends HTMLElement {
     if (!state) return;
 
     const snEl = this.shadowRoot.getElementById("device_sn");
-    if (snEl) snEl.textContent = this._config.sn || "";
+    if (snEl) snEl.textContent = "SN: " + (this._config.sn || "");
 
     const isOnline = state.state !== "unavailable";
     const offlineBanner = this.shadowRoot.getElementById("offline_banner");
@@ -195,12 +374,34 @@ class HanchuessEnergyCard extends HTMLElement {
     if (submitBtn) submitBtn.disabled = !isOnline;
     if (loadBtn) loadBtn.disabled = !isOnline;
 
+    const quickConfirm = this.shadowRoot.getElementById("quick_confirm");
+    const quickCancel = this.shadowRoot.getElementById("quick_cancel");
+    if (quickConfirm) quickConfirm.disabled = !isOnline;
+    if (quickCancel) quickCancel.disabled = !isOnline;
+
+    // Fast charge/discharge running status
+    const quickRunning = this.shadowRoot.getElementById("quick_running");
+    if (quickRunning) {
+      const fastStatus = state.attributes.fast_chg_status;
+      const fastRemain = Number(state.attributes.fast_chg_remain || 0);
+      if (fastStatus == 1 || fastStatus == 2) {
+        const label = fastStatus == 1 ? _t(this._hass, 'fast_charging') : _t(this._hass, 'fast_discharging');
+        const min = Math.floor(fastRemain / 60);
+        const sec = fastRemain % 60;
+        const timeStr = min > 0 ? `${min}m${String(sec).padStart(2, '0')}s` : `${sec}s`;
+        quickRunning.textContent = `${label} · ${_t(this._hass, 'remaining')} ${timeStr}`;
+        quickRunning.style.display = "block";
+      } else {
+        quickRunning.style.display = "none";
+      }
+    }
+
     const select = this.shadowRoot.getElementById("work_mode");
     if (!select) return;
 
     const options = state.attributes.options || [];
     if (select.options.length !== options.length + 1) {
-      select.innerHTML = `<option value="">请选择</option>` +
+      select.innerHTML = `<option value="">${_t(this._hass, 'please_select')}</option>` +
         options.map(opt => `<option value="${opt}">${opt}</option>`).join("");
     }
 
@@ -259,7 +460,7 @@ class HanchuessEnergyCard extends HTMLElement {
           }
         }
         // "是否应用" from FLAG_ENABLE_CYCLE, not from array
-        switchHtml = `<span class="collapse-sw-label">是否应用</span><label class="toggle"><input type="checkbox" data-enable-signal="${field.code}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
+        switchHtml = `<span class="collapse-sw-label">${_t(this._hass, 'apply')}</span><label class="toggle"><input type="checkbox" data-enable-signal="${field.code}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
         html += `<div class="${cls}" ${la} data-signal="${sig}" data-collapse="${field.code}"><div class="collapse-card"><div class="collapse-header"><span class="collapse-arrow" data-arrow="${field.code}" data-toggle="${field.code}">▶</span><span class="collapse-title" data-toggle="${field.code}">${field.name}</span>${switchHtml}</div><div class="collapse-body" data-body="${field.code}">${bodyHtml}</div></div></div>`;
       }
     }
@@ -555,7 +756,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const loadBtn = this.shadowRoot.getElementById("load_btn");
     const statusMsg = this.shadowRoot.getElementById("status_msg");
     loadBtn.disabled = true;
-    statusMsg.textContent = "加载中...";
+    statusMsg.textContent = _t(this._hass, 'loading');
     statusMsg.className = "status";
 
     const state = this._hass.states[this._config.entity];
@@ -698,10 +899,10 @@ class HanchuessEnergyCard extends HTMLElement {
       const select = this.shadowRoot.getElementById("work_mode");
       this._toggleFields(select.value);
 
-      statusMsg.textContent = "数据加载成功";
+      statusMsg.textContent = _t(this._hass, 'load_success');
       statusMsg.className = "status success";
     } catch (err) {
-      statusMsg.textContent = "加载失败: " + err.message;
+      statusMsg.textContent = _t(this._hass, 'load_fail') + err.message;
       statusMsg.className = "status error";
     }
 
@@ -713,7 +914,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const submitBtn = this.shadowRoot.getElementById("submit_btn");
     const statusMsg = this.shadowRoot.getElementById("status_msg");
     submitBtn.disabled = true;
-    statusMsg.textContent = "提交中...";
+    statusMsg.textContent = _t(this._hass, 'submitting');
     statusMsg.className = "status";
 
     const state = this._hass.states[this._config.entity];
@@ -858,7 +1059,7 @@ class HanchuessEnergyCard extends HTMLElement {
     });
 
     if (Object.keys(valueMap).length === 0) {
-      statusMsg.textContent = "没有修改";
+      statusMsg.textContent = _t(this._hass, 'no_change');
       statusMsg.className = "status";
       submitBtn.disabled = false;
       setTimeout(() => { statusMsg.textContent = ""; }, 2000);
@@ -875,11 +1076,11 @@ class HanchuessEnergyCard extends HTMLElement {
 
       Object.assign(this._originalValues, valueMap);
 
-      statusMsg.textContent = "设定成功";
+      statusMsg.textContent = _t(this._hass, 'submit_success');
       statusMsg.className = "status success";
     } catch (err) {
-      const errMsg = err.message || err.error || "未知错误";
-      statusMsg.textContent = "设定失败: " + errMsg;
+      const errMsg = err.message || err.error || _t(this._hass, 'unknown_error');
+      statusMsg.textContent = _t(this._hass, 'submit_fail') + errMsg;
       statusMsg.className = "status error";
     }
 
@@ -902,8 +1103,68 @@ class HanchuessEnergyCard extends HTMLElement {
     if (newStr !== JSON.stringify(origCycle)) targetMap["FLAG_ENABLE_CYCLE"] = newStr;
   }
 
+  async _quickChargeDischarge() {
+    const statusEl = this.shadowRoot.getElementById("quick_status");
+    const confirmBtn = this.shadowRoot.getElementById("quick_confirm");
+    const mode = this.shadowRoot.getElementById("quick_mode").value;
+    const duration = this.shadowRoot.getElementById("quick_duration").value;
+
+    if (!duration || Number(duration) < 1 || Number(duration) > 1440) {
+      statusEl.textContent = _t(this._hass, 'duration_range');
+      statusEl.className = "quick-status error";
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    statusEl.textContent = _t(this._hass, 'submitting');
+    statusEl.className = "quick-status";
+
+    try {
+      await this._hass.callWS({
+        type: "hanchuess/fast_charge",
+        sn: this._config.sn,
+        act: Number(mode),
+        duration: Number(duration) * 60,
+      });
+      statusEl.textContent = _t(this._hass, 'cmd_sent');
+      statusEl.className = "quick-status success";
+    } catch (err) {
+      statusEl.textContent = _t(this._hass, 'fail_prefix') + (err.message || _t(this._hass, 'unknown_error'));
+      statusEl.className = "quick-status error";
+    }
+    confirmBtn.disabled = false;
+    setTimeout(() => { statusEl.textContent = ""; }, 3000);
+  }
+
+  async _quickStop() {
+    const statusEl = this.shadowRoot.getElementById("quick_status");
+    const cancelBtn = this.shadowRoot.getElementById("quick_cancel");
+    cancelBtn.disabled = true;
+    statusEl.textContent = _t(this._hass, 'stopping');
+    statusEl.className = "quick-status";
+
+    const curMode = Number(this.shadowRoot.getElementById("quick_mode").value);
+    const stopAct = curMode === 3 ? -3 : -2;
+    try {
+      await this._hass.callWS({
+        type: "hanchuess/fast_charge",
+        sn: this._config.sn,
+        act: stopAct,
+        duration: 0,
+      });
+      this.shadowRoot.getElementById("quick_duration").value = "60";
+      statusEl.textContent = _t(this._hass, 'stopped');
+      statusEl.className = "quick-status success";
+    } catch (err) {
+      statusEl.textContent = _t(this._hass, 'fail_prefix') + (err.message || _t(this._hass, 'unknown_error'));
+      statusEl.className = "quick-status error";
+    }
+    cancelBtn.disabled = false;
+    setTimeout(() => { statusEl.textContent = ""; }, 3000);
+  }
+
   getCardSize() {
-    return 4;
+    return 5;
   }
 }
 customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
@@ -911,6 +1172,6 @@ customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "hanchuess-energy-card",
-  name: "Hanchuess 储能设置",
-  description: "Hanchuess 逆变器储能设置卡片",
+  name: "Hanchuess Energy Settings",
+  description: "Hanchuess inverter energy settings card",
 });
