@@ -34,6 +34,7 @@ const HANCHUESS_I18N = {
     fast_charging: "Charging",
     fast_discharging: "Discharging",
     remaining: "remaining",
+    quick_tip: "To ensure optimal performance and safety, please do not change any control settings or perform OTA updates during fast charging or discharging.",
     card_name: "Hanchuess Energy Settings",
     card_desc: "Hanchuess inverter energy settings card",
   },
@@ -71,6 +72,7 @@ const HANCHUESS_I18N = {
     fast_charging: "充电中",
     fast_discharging: "放电中",
     remaining: "剩余",
+    quick_tip: "为确保最佳性能和安全，快速充放电期间请勿修改任何控制设置或执行OTA升级。",
     card_name: "Hanchuess 储能设置",
     card_desc: "Hanchuess 逆变器储能设置卡片",
   },
@@ -176,6 +178,11 @@ class HanchuessEnergyCard extends HTMLElement {
         .sn-bar { font-size: 16px; font-weight: 500; margin-bottom: 16px; color: var(--primary-color); }
         .quick-section { border: 1px solid var(--divider-color); border-radius: 6px; padding: 12px; margin-bottom: 16px; }
         .quick-title { font-size: 14px; font-weight: 500; margin-bottom: 10px; color: var(--primary-color); }
+        .quick-tip {
+          font-size: 12px; color: var(--secondary-text-color); padding: 8px 10px;
+          border: 1px solid var(--divider-color); border-radius: 4px; margin-bottom: 10px;
+          line-height: 1.4;
+        }
         .quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .quick-row label { min-width: 60px; font-size: 13px; color: var(--secondary-text-color); white-space: nowrap; }
         .quick-row select, .quick-row input {
@@ -273,6 +280,7 @@ class HanchuessEnergyCard extends HTMLElement {
         <!-- 快速充放电 -->
         <div class="quick-section" id="quick_section">
           <div class="quick-title">${_t(this._hass, 'quick_charge')}</div>
+          <div class="quick-tip">${_t(this._hass, 'quick_tip')}</div>
           <div class="quick-row">
             <label>${_t(this._hass, 'mode')}</label>
             <select id="quick_mode">
