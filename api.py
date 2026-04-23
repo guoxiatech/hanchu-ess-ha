@@ -45,16 +45,15 @@ class HanchuessApiClient:
                     async with session.post(
                         url, json=data, headers=self._headers(language)
                     ) as response:
-                        response_text = await response.text()
-                        _LOGGER.debug("[HANCHUESS] response: %s status=%s body=%s", path, response.status, response_text[:500])
+                        result = await response.json(content_type=None)
+                        _LOGGER.debug("[HANCHUESS] response: %s status=%s body=%s", path, response.status, str(result)[:500])
                         if response.status == 401:
                             return {"success": False, "code": 401}
                         if response.status == 200:
-                            result = await response.json(content_type=None)
                             if result.get("code") == 401:
                                 return {"success": False, "code": 401}
                             return result
-                        _LOGGER.error("[HANCHUESS] unexpected status: %s %s", response.status, response_text[:200])
+                        _LOGGER.error("[HANCHUESS] unexpected status: %s %s", response.status, str(result)[:200])
         except TimeoutError:
             _LOGGER.error("[HANCHUESS] Request timeout: %s", url)
         except Exception as err:

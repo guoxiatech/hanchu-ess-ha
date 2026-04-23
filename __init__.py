@@ -160,7 +160,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     stats_coordinator = HanchuessStatisticsCoordinator(hass, entry, client)
-    await stats_coordinator.async_config_entry_first_refresh()
+    try:
+        await stats_coordinator.async_config_entry_first_refresh()
+    except Exception:
+        _LOGGER.warning("[HANCHUESS] Statistics first refresh failed, will retry later")
 
     hass.data[DOMAIN][entry.entry_id] = {
         "realtime": coordinator,

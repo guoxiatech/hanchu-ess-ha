@@ -365,13 +365,19 @@ class HanchuessEnergyCard extends HTMLElement {
 
     const fastStatus = Number(state.attributes.fast_chg_status || 0);
     const serverRemain = Number(state.attributes.fast_chg_remain || 0);
-    const isRunning = this._localFastStatus ? true : (fastStatus === 1 || fastStatus === 2);
-    const curStatus = this._localFastStatus || fastStatus;
 
-    if (serverRemain > 0 && (fastStatus === 1 || fastStatus === 2)) {
-      this._localRemainSec = serverRemain;
-      this._localFastStatus = fastStatus;
+    if (this._forceStopped && (fastStatus === 1 || fastStatus === 2)) {
+      // server hasn't caught up yet, treat as idle
+    } else {
+      this._forceStopped = false;
+      if (serverRemain > 0 && (fastStatus === 1 || fastStatus === 2)) {
+        this._localRemainSec = serverRemain;
+        this._localFastStatus = fastStatus;
+      }
     }
+
+    const isRunning = this._localFastStatus ? true : (!this._forceStopped && (fastStatus === 1 || fastStatus === 2));
+    const curStatus = this._localFastStatus || fastStatus;
 
     const remainMin = Math.ceil((this._localRemainSec || serverRemain) / 60);
 
@@ -1130,6 +1136,7 @@ class HanchuessEnergyCard extends HTMLElement {
         duration: Number(duration) * 60,
       });
       statusEl.textContent = "";
+      this._forceStopped = false;
       this._localFastStatus = Number(mode) === 2 ? 1 : 2;
       this._localRemainSec = Number(duration) * 60;
       if (this._localCountdown) clearInterval(this._localCountdown);
@@ -1170,6 +1177,7 @@ class HanchuessEnergyCard extends HTMLElement {
       });
       this._localFastStatus = 0;
       this._localRemainSec = 0;
+      this._forceStopped = true;
       if (this._localCountdown) { clearInterval(this._localCountdown); this._localCountdown = null; }
       this._updateStatus();
       statusEl.textContent = _t(this._hass, 'stopped');
@@ -1189,8 +1197,9 @@ class HanchuessEnergyCard extends HTMLElement {
 customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
 
 window.customCards = window.customCards || [];
+const _cardLang = (navigator.language || "en").startsWith("zh") ? "zh-Hans" : "en";
 window.customCards.push({
   type: "hanchuess-energy-card",
-  name: "Hanchuess Energy Settings",
-  description: "Hanchuess inverter energy settings card",
+  name: HANCHUESS_I18N[_cardLang].card_name,
+  description: HANCHUESS_I18N[_cardLang].card_desc,
 });
