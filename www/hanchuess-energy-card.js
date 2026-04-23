@@ -179,8 +179,8 @@ class HanchuessEnergyCard extends HTMLElement {
         .quick-section { border: 1px solid var(--divider-color); border-radius: 6px; padding: 12px; margin-bottom: 16px; }
         .quick-title { font-size: 14px; font-weight: 500; margin-bottom: 10px; color: var(--primary-color); }
         .quick-tip {
-          font-size: 12px; color: var(--secondary-text-color); padding: 8px 10px;
-          border: 1px solid var(--divider-color); border-radius: 4px; margin-bottom: 10px;
+          font-size: 10px; color: #262626; padding: 8px;
+          background: #ffddb5; border-radius: 12px; margin-bottom: 20px;
           line-height: 1.4;
         }
         .quick-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
