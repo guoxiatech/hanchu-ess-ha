@@ -227,10 +227,17 @@ class HanchuessEnergyCard extends HTMLElement {
         .quick-status.error { color: var(--error-color); }
         .quick-status.success { color: var(--success-color, #4caf50); }
         .quick-running {
-          background: var(--primary-color); color: white; padding: 6px 10px;
-          border-radius: 4px; font-size: 13px; text-align: center; margin-bottom: 8px;
-          display: none;
+          background: var(--primary-color); color: white; padding: 8px 12px;
+          border-radius: 4px; font-size: 13px; margin-bottom: 8px;
+          display: none; align-items: center; justify-content: space-between;
         }
+        .quick-running .stop-btn {
+          background: rgba(255,255,255,0.25); border: none; color: white;
+          width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .quick-running .stop-btn:hover { background: rgba(255,255,255,0.4); }
+        .quick-running .stop-btn svg { width: 16px; height: 16px; fill: white; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .title { font-size: 18px; font-weight: 500; }
         .header-btns { display: flex; gap: 8px; }
@@ -308,9 +315,13 @@ class HanchuessEnergyCard extends HTMLElement {
             <label>${_t(this._hass, 'duration_min')}</label>
             <input type="number" id="quick_duration" min="1" max="1440" value="60" placeholder="1~1440">
           </div>
-          <div class="quick-running" id="quick_running"></div>
-          <div class="quick-btns">
-            <button class="btn" id="quick_cancel" style="background:var(--divider-color);color:var(--primary-text-color);">${_t(this._hass, 'cancel')}</button>
+          <div class="quick-running" id="quick_running">
+            <span id="quick_running_text"></span>
+            <button class="stop-btn" id="quick_stop_btn" title="${_t(this._hass, 'stop')}">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="white" stroke-width="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            </button>
+          </div>
+          <div class="quick-btns" id="quick_btns">
             <button class="btn btn-submit" id="quick_confirm">${_t(this._hass, 'confirm')}</button>
           </div>
           <div class="quick-status" id="quick_status"></div>
@@ -352,7 +363,7 @@ class HanchuessEnergyCard extends HTMLElement {
       this._quickChargeDischarge();
     });
 
-    this.shadowRoot.getElementById("quick_cancel").addEventListener("click", () => {
+    this.shadowRoot.getElementById("quick_stop_btn").addEventListener("click", () => {
       this._quickStop();
     });
   }
@@ -375,25 +386,33 @@ class HanchuessEnergyCard extends HTMLElement {
     if (loadBtn) loadBtn.disabled = !isOnline;
 
     const quickConfirm = this.shadowRoot.getElementById("quick_confirm");
-    const quickCancel = this.shadowRoot.getElementById("quick_cancel");
-    if (quickConfirm) quickConfirm.disabled = !isOnline;
-    if (quickCancel) quickCancel.disabled = !isOnline;
-
-    // Fast charge/discharge running status
+    const quickMode = this.shadowRoot.getElementById("quick_mode");
+    const quickDuration = this.shadowRoot.getElementById("quick_duration");
+    const quickBtns = this.shadowRoot.getElementById("quick_btns");
     const quickRunning = this.shadowRoot.getElementById("quick_running");
-    if (quickRunning) {
-      const fastStatus = state.attributes.fast_chg_status;
-      const fastRemain = Number(state.attributes.fast_chg_remain || 0);
-      if (fastStatus == 1 || fastStatus == 2) {
-        const label = fastStatus == 1 ? _t(this._hass, 'fast_charging') : _t(this._hass, 'fast_discharging');
-        const min = Math.floor(fastRemain / 60);
-        const sec = fastRemain % 60;
-        const timeStr = min > 0 ? `${min}m${String(sec).padStart(2, '0')}s` : `${sec}s`;
-        quickRunning.textContent = `${label} · ${_t(this._hass, 'remaining')} ${timeStr}`;
-        quickRunning.style.display = "block";
-      } else {
-        quickRunning.style.display = "none";
-      }
+    const quickRunningText = this.shadowRoot.getElementById("quick_running_text");
+
+    const fastStatus = Number(state.attributes.fast_chg_status || 0);
+    const fastRemain = Number(state.attributes.fast_chg_remain || 0);
+    const isRunning = fastStatus === 1 || fastStatus === 2;
+
+    if (isRunning && quickRunning && quickRunningText) {
+      const label = fastStatus === 1 ? _t(this._hass, 'fast_charging') : _t(this._hass, 'fast_discharging');
+      const min = Math.floor(fastRemain / 60);
+      const sec = fastRemain % 60;
+      const timeStr = min > 0 ? `${min}m${String(sec).padStart(2, '0')}s` : `${sec}s`;
+      quickRunningText.textContent = `${label} \u00b7 ${_t(this._hass, 'remaining')} ${timeStr}`;
+      quickRunning.style.display = "flex";
+      if (quickBtns) quickBtns.style.display = "none";
+      if (quickMode) quickMode.disabled = true;
+      if (quickDuration) quickDuration.disabled = true;
+    } else {
+      if (quickRunning) quickRunning.style.display = "none";
+      if (quickBtns) quickBtns.style.display = "flex";
+      const canOperate = isOnline && !isRunning;
+      if (quickConfirm) quickConfirm.disabled = !canOperate;
+      if (quickMode) quickMode.disabled = !canOperate;
+      if (quickDuration) quickDuration.disabled = !canOperate;
     }
 
     const select = this.shadowRoot.getElementById("work_mode");
@@ -1138,13 +1157,14 @@ class HanchuessEnergyCard extends HTMLElement {
 
   async _quickStop() {
     const statusEl = this.shadowRoot.getElementById("quick_status");
-    const cancelBtn = this.shadowRoot.getElementById("quick_cancel");
-    cancelBtn.disabled = true;
+    const stopBtn = this.shadowRoot.getElementById("quick_stop_btn");
+    if (stopBtn) stopBtn.disabled = true;
     statusEl.textContent = _t(this._hass, 'stopping');
     statusEl.className = "quick-status";
 
-    const curMode = Number(this.shadowRoot.getElementById("quick_mode").value);
-    const stopAct = curMode === 3 ? -3 : -2;
+    const state = this._hass.states[this._config.entity];
+    const fastStatus = Number(state && state.attributes.fast_chg_status || 0);
+    const stopAct = fastStatus === 2 ? -3 : -2;
     try {
       await this._hass.callWS({
         type: "hanchuess/fast_charge",
@@ -1152,14 +1172,13 @@ class HanchuessEnergyCard extends HTMLElement {
         act: stopAct,
         duration: 0,
       });
-      this.shadowRoot.getElementById("quick_duration").value = "60";
       statusEl.textContent = _t(this._hass, 'stopped');
       statusEl.className = "quick-status success";
     } catch (err) {
       statusEl.textContent = _t(this._hass, 'fail_prefix') + (err.message || _t(this._hass, 'unknown_error'));
       statusEl.className = "quick-status error";
     }
-    cancelBtn.disabled = false;
+    if (stopBtn) stopBtn.disabled = false;
     setTimeout(() => { statusEl.textContent = ""; }, 3000);
   }
 
