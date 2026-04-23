@@ -144,13 +144,14 @@ class HanchuessApiClient:
             "/gateway/app/ha/fastChargeDischarge",
             {"sn": sn, "act": act, "duration": duration},
         )
+        _LOGGER.debug("[HANCHUESS] fastChargeDischarge result: %s", result)
         if not result:
             return {"success": False, "msg": "Request failed"}
         if result.get("code") == 401:
             return {"success": False, "msg": "token_expired"}
         if result.get("code") == 100:
             return {"success": False, "msg": result.get("msg", "Device error")}
-        if result.get("success"):
+        if result.get("success") or result.get("code") == 200:
             return {"success": True, "data": result.get("data", {})}
         return {"success": False, "msg": result.get("msg", "Unknown error")}
 

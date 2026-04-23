@@ -313,7 +313,7 @@ class HanchuessEnergyCard extends HTMLElement {
           </div>
           <div class="quick-row">
             <label>${_t(this._hass, 'duration_min')}</label>
-            <input type="number" id="quick_duration" min="1" max="1440" value="60" placeholder="1~1440">
+            <input type="number" id="quick_duration" min="1" max="1440" value="30" placeholder="1~1440">
           </div>
           <div class="quick-running" id="quick_running">
             <span id="quick_running_text"></span>
