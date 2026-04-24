@@ -1,4 +1,6 @@
 """Sensor platform for Hanchuess."""
+import json
+import logging
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -12,11 +14,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
 
+_LOGGER = logging.getLogger(__name__)
+
 SENSORS = {
-    "device_status": {
-        "key": "devStatus",
-        "icon": "mdi:check-circle",
-    },
     "battery_soc": {
         "key": "batSoc",
         "device_class": SensorDeviceClass.BATTERY,
@@ -125,6 +125,99 @@ STATUS_MAP = {
 }
 
 
+def _parse_energy_menu(menu_data: dict) -> dict:
+    result = {"work_mode_options": [], "fields": []}
+    data = menu_data.get("data", {})
+    energy = data.get("energy")
+    if not energy:
+        for key, val in data.items():
+            if isinstance(val, dict) and "energy" in key:
+                energy = val
+                break
+    if not energy:
+        return result
+    for group in energy.get("items", []):
+        for item in group:
+            item_type = item.get("itemType")
+            item_code = item.get("itemCode")
+            signal = item.get("itemCodeSignal") or item.get("itemCode", "")
+            if item_code in ("work_mode", "WORK_MODE_CMB") and item_type == "3":
+                try:
+                    options = json.loads(item.get("optVal", "[]"))
+                    result["work_mode_options"] = [
+                        {"label": opt["name"], "value": opt["value"], "signal": signal}
+                        for opt in options
+                    ]
+                except (json.JSONDecodeError, KeyError):
+                    _LOGGER.error("Failed to parse work mode options")
+                continue
+            field = {"code": item_code, "signal": signal, "type": item_type, "name": item.get("itemName", "")}
+            listener = item.get("listener")
+            if item_type == "1":
+                field["min"] = item.get("minVal", "")
+                field["max"] = item.get("maxVal", "")
+            if item_type == "3":
+                try:
+                    field["options"] = json.loads(item.get("optVal", "[]"))
+                except (json.JSONDecodeError, KeyError):
+                    field["options"] = []
+            if item_type == "4":
+                field["onVal"] = item.get("onVal")
+                field["offVal"] = item.get("offVal")
+            if item_type == "6":
+                field["format"] = item.get("defFmt", "HH:mm")
+            if item.get("structure"):
+                idx_map = {"charge_mode": 1, "chg_pwr_lmt": 2, "start_time": 3, "end_time": 4}
+                children = []
+                for child in item.get("structure"):
+                    code = child.get("itemCode", "")
+                    ct = child.get("itemType", "")
+                    c = {"code": code, "type": ct if ct not in ("5", "6") else "5", "name": child.get("itemName", ""), "index": idx_map.get(code, 0)}
+                    if ct == "1":
+                        dv = child.get("defVal", "")
+                        try:
+                            bounds = json.loads(dv) if dv else []
+                            c["min"] = str(bounds[0]) if len(bounds) > 0 else child.get("minVal", "0")
+                            c["max"] = str(bounds[1]) if len(bounds) > 1 else child.get("maxVal", "99999")
+                        except (json.JSONDecodeError, ValueError):
+                            c["min"] = child.get("minVal", "0")
+                            c["max"] = child.get("maxVal", "99999")
+                    if ct == "3":
+                        try:
+                            c["options"] = json.loads(child.get("optVal", "[]"))
+                        except (json.JSONDecodeError, KeyError):
+                            c["options"] = []
+                    children.append(c)
+                if item_type in ("82", "83") and item.get("itemCodeSignal"):
+                    base_code = item_code.rstrip("0123456789")
+                    base_name = field["name"].rstrip("0123456789").rstrip()
+                    for i in range(3):
+                        slot = {"code": f"{base_code}{i}", "signal": f"{signal}{i}" if not signal[-1].isdigit() else f"{signal[:-1]}{i}", "type": "collapse", "name": f"{base_name}{i + 1}", "children": children}
+                        if listener:
+                            slot["listener_code"] = listener.get("code", "")
+                            slot["listener_show"] = listener.get("show", "")
+                        if item.get("hidden"):
+                            slot["hidden"] = True
+                        result["fields"].append(slot)
+                else:
+                    field["type"] = "collapse"
+                    field["children"] = children
+                    if listener:
+                        field["listener_code"] = listener.get("code", "")
+                        field["listener_show"] = listener.get("show", "")
+                    if item.get("hidden"):
+                        field["hidden"] = True
+                    result["fields"].append(field)
+                continue
+            if listener:
+                field["listener_code"] = listener.get("code", "")
+                field["listener_show"] = listener.get("show", "")
+            if item.get("hidden"):
+                field["hidden"] = True
+            result["fields"].append(field)
+    return result
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
@@ -132,6 +225,9 @@ async def async_setup_entry(
     realtime = data["realtime"]
     statistics = data["statistics"]
     entities = []
+    # Device status sensor with card attributes
+    entities.append(DeviceStatusSensor(realtime, entry))
+    # Other realtime sensors
     for sensor_key, config in SENSORS.items():
         cond_key = config.get("condition_key")
         if cond_key:
@@ -139,6 +235,7 @@ async def async_setup_entry(
                 continue
         if config["key"] in realtime.data:
             entities.append(HanchueSensor(realtime, entry, sensor_key, config))
+    # Statistics sensors
     for sensor_key, config in STATISTICS_SENSORS.items():
         cond_key = config.get("condition_key")
         if cond_key:
@@ -180,14 +277,76 @@ class HanchueSensor(CoordinatorEntity, SensorEntity):
         value = self.coordinator.data.get(self._config["key"])
         if value is None:
             return None
-        if self._sensor_key == "device_status":
-            try:
-                return STATUS_MAP.get(int(value), "unknown")
-            except (ValueError, TypeError):
-                return "unknown"
         if "scale" in self._config:
             try:
                 return round(float(value) * self._config["scale"], 1)
             except (ValueError, TypeError):
                 return None
         return value
+
+
+class DeviceStatusSensor(CoordinatorEntity, SensorEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "device_status"
+    _attr_icon = "mdi:check-circle"
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.data['sn']}_device_status"
+        self._work_mode_options = []
+        self._energy_fields = []
+        self._menu_loaded = False
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.data["sn"])},
+            name=f"Hanchuess {self._entry.data['sn']}",
+            manufacturer="Hanchuess",
+            model="ESS Device",
+        )
+
+    @property
+    def native_value(self):
+        value = self.coordinator.data.get("devStatus")
+        if value is None:
+            return None
+        try:
+            return STATUS_MAP.get(int(value), "unknown")
+        except (ValueError, TypeError):
+            return "unknown"
+
+    @property
+    def extra_state_attributes(self):
+        fast_chg = self.coordinator.data.get("deviceStatusOfTestFastChg")
+        remain = self.coordinator.data.get("testTimeRemain")
+        attrs = {
+            "sn": self._entry.data["sn"],
+            "energy_fields": self._energy_fields,
+            "work_mode_options": self._work_mode_options,
+        }
+        if fast_chg is not None:
+            attrs["fast_chg_status"] = fast_chg
+        if remain is not None:
+            attrs["fast_chg_remain"] = remain
+        return attrs
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        await self._refresh_menu()
+
+    async def async_update(self) -> None:
+        if not self._menu_loaded:
+            await self._refresh_menu()
+        await super().async_update()
+
+    async def _refresh_menu(self) -> None:
+        language = self.hass.config.language or "en"
+        sn = self._entry.data["sn"]
+        menu_data = await self.coordinator.client.async_get_menu(sn, language)
+        parsed = _parse_energy_menu(menu_data)
+        if parsed["work_mode_options"]:
+            self._work_mode_options = parsed["work_mode_options"]
+            self._energy_fields = parsed["fields"]
+            self._menu_loaded = True

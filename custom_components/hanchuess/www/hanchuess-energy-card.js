@@ -105,7 +105,7 @@ class HanchuessEnergyCardEditor extends HTMLElement {
     if (!this._hass || !this._config) return;
 
     const entities = Object.keys(this._hass.states)
-      .filter(eid => eid.startsWith("select.") && eid.includes("work_mode"));
+      .filter(eid => eid.startsWith("sensor.") && eid.includes("device_status") && eid.includes("hanchuess"));
 
     this.innerHTML = `
       <div style="padding: 16px;">
@@ -114,7 +114,7 @@ class HanchuessEnergyCardEditor extends HTMLElement {
           <option value="">${_t(this._hass, 'select_device')}</option>
           ${entities.map(eid => {
             const state = this._hass.states[eid];
-            const name = (state.attributes.friendly_name || eid).replace(/ 工作模式| Work Mode/g, "");
+            const name = (state.attributes.friendly_name || eid).replace(/ [Dd]evice [Ss]tatus| 设备状态/g, "");
             const selected = this._config.entity === eid ? "selected" : "";
             return `<option value="${eid}" ${selected}>${name}</option>`;
           }).join("")}
@@ -128,7 +128,7 @@ class HanchuessEnergyCardEditor extends HTMLElement {
       let sn = "";
       if (state && state.attributes) sn = state.attributes.sn || "";
       if (!sn) {
-        const m = entityId.match(/hanchuess_(.+?)_work_mode/);
+        const m = entityId.match(/hanchuess_(.+?)_device_status/);
         if (m) sn = m[1].toUpperCase();
       }
 
@@ -167,11 +167,11 @@ class HanchuessEnergyCard extends HTMLElement {
 
   static getStubConfig(hass) {
     const entity = Object.keys(hass.states)
-      .find(eid => eid.startsWith("select.") && eid.includes("work_mode")) || "";
+      .find(eid => eid.startsWith("sensor.") && eid.includes("device_status") && eid.includes("hanchuess")) || "";
     const state = hass.states[entity];
     let sn = state && state.attributes ? (state.attributes.sn || "") : "";
     if (!sn) {
-      const m = entity.match(/hanchuess_(.+?)_work_mode/);
+      const m = entity.match(/hanchuess_(.+?)_device_status/);
       if (m) sn = m[1].toUpperCase();
     }
     return { entity, sn };
@@ -365,7 +365,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const snEl = this.shadowRoot.getElementById("device_sn");
     if (snEl) snEl.textContent = "SN: " + (this._config.sn || "");
 
-    const isOnline = state.state !== "unavailable";
+    const isOnline = state.state === "online";
     const offlineBanner = this.shadowRoot.getElementById("offline_banner");
     const submitBtn = this.shadowRoot.getElementById("submit_btn");
     const loadBtn = this.shadowRoot.getElementById("load_btn");

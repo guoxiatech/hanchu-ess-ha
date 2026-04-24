@@ -1,4 +1,4 @@
 """Constants for Hanchuess integration."""
 DOMAIN = "hanchuess"
-PLATFORMS = ["sensor", "select", "number", "switch"]
+PLATFORMS = ["sensor", "number", "switch"]
 BASE_URL = "https://iess-international.hanchuess.net"

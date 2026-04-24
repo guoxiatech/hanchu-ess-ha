@@ -43,9 +43,6 @@
       "daily_grid_export": { "name": "今日电网售电" },
       "daily_dg_energy": { "name": "今日柴发发电" }
     },
-    "select": {
-      "work_mode": { "name": "工作模式" }
-    },
     "number": {
       "charge_power_limit": { "name": "最大充电功率" },
       "discharge_power_limit": { "name": "最大放电功率" },

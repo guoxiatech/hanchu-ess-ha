@@ -43,9 +43,6 @@
       "daily_grid_export": { "name": "Daily Grid Export" },
       "daily_dg_energy": { "name": "Daily Generator Energy" }
     },
-    "select": {
-      "work_mode": { "name": "Work Mode" }
-    },
     "number": {
       "charge_power_limit": { "name": "Charge Power Limit" },
       "discharge_power_limit": { "name": "Discharge Power Limit" },
