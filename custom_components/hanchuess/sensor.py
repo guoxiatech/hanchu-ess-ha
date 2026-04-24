@@ -233,8 +233,7 @@ async def async_setup_entry(
         if cond_key:
             if realtime.data.get(cond_key) != config.get("condition_value"):
                 continue
-        if config["key"] in realtime.data:
-            entities.append(HanchueSensor(realtime, entry, sensor_key, config))
+        entities.append(HanchueSensor(realtime, entry, sensor_key, config))
     # Statistics sensors
     for sensor_key, config in STATISTICS_SENSORS.items():
         cond_key = config.get("condition_key")

@@ -35,8 +35,8 @@ const HANCHUESS_I18N = {
     fast_discharging: "Discharging",
     remaining: "remaining",
     quick_tip: "To ensure optimal performance and safety, please do not change any control settings or perform OTA updates during fast charging or discharging.",
-    card_name: "Hanchuess Energy Settings",
-    card_desc: "Hanchuess inverter energy settings card",
+    card_name: "Hanchuess Remote Settings",
+    card_desc: "Hanchuess device remote settings card",
   },
   "zh-Hans": {
     device: "设备",
@@ -73,8 +73,8 @@ const HANCHUESS_I18N = {
     fast_discharging: "放电中",
     remaining: "剩余",
     quick_tip: "为确保最佳性能和安全，快速充放电期间请勿修改任何控制设置或执行OTA升级。",
-    card_name: "Hanchuess 储能设置",
-    card_desc: "Hanchuess 逆变器储能设置卡片",
+    card_name: "Hanchuess 远程设置",
+    card_desc: "Hanchuess 设备远程设置卡片",
   },
 };
 
@@ -1214,7 +1214,7 @@ class HanchuessEnergyCard extends HTMLElement {
 customElements.define("hanchuess-energy-card", HanchuessEnergyCard);
 
 window.customCards = window.customCards || [];
-const _cardLang = (navigator.language || "en").startsWith("zh") ? "zh-Hans" : "en";
+const _cardLang = "en";
 window.customCards.push({
   type: "hanchuess-energy-card",
   name: HANCHUESS_I18N[_cardLang].card_name,
