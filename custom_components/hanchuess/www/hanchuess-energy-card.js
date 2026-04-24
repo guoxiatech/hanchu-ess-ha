@@ -125,7 +125,12 @@ class HanchuessEnergyCardEditor extends HTMLElement {
     this.querySelector("#entity_select").addEventListener("change", (e) => {
       const entityId = e.target.value;
       const state = this._hass.states[entityId];
-      const sn = state && state.attributes ? (state.attributes.sn || "") : "";
+      let sn = "";
+      if (state && state.attributes) sn = state.attributes.sn || "";
+      if (!sn) {
+        const m = entityId.match(/hanchuess_(.+?)_work_mode/);
+        if (m) sn = m[1].toUpperCase();
+      }
 
       this._config = { ...this._config, entity: entityId, sn: sn };
       this.dispatchEvent(new CustomEvent("config-changed", {
@@ -164,7 +169,11 @@ class HanchuessEnergyCard extends HTMLElement {
     const entity = Object.keys(hass.states)
       .find(eid => eid.startsWith("select.") && eid.includes("work_mode")) || "";
     const state = hass.states[entity];
-    const sn = state && state.attributes ? (state.attributes.sn || "") : "";
+    let sn = state && state.attributes ? (state.attributes.sn || "") : "";
+    if (!sn) {
+      const m = entity.match(/hanchuess_(.+?)_work_mode/);
+      if (m) sn = m[1].toUpperCase();
+    }
     return { entity, sn };
   }
 
