@@ -26,14 +26,17 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     # Register static path for custom card
-    from homeassistant.components.http import StaticPathConfig
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(
-            "/hacsfiles/hanchuess",
-            os.path.join(os.path.dirname(__file__), "www"),
-            cache_headers=False,
-        )
-    ])
+    try:
+        from homeassistant.components.http import StaticPathConfig
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(
+                "/hacsfiles/hanchuess",
+                os.path.join(os.path.dirname(__file__), "www"),
+                cache_headers=False,
+            )
+        ])
+    except Exception:
+        _LOGGER.warning("[HANCHUESS] Static path registration failed")
 
     # Register websocket commands
     websocket_api.async_register_command(hass, ws_iot_get)
