@@ -425,7 +425,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const select = this.shadowRoot.getElementById("work_mode");
     if (!select) return;
 
-    const options = state.attributes.options || [];
+    const options = (state.attributes.work_mode_options || []).map(opt => opt.label);
     if (select.options.length !== options.length + 1) {
       select.innerHTML = `<option value="">${_t(this._hass, 'please_select')}</option>` +
         options.map(opt => `<option value="${opt}">${opt}</option>`).join("");
