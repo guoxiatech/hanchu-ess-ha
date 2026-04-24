@@ -171,6 +171,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "work_mode"
     _attr_icon = "mdi:tune"
+    _attr_entity_registry_visible_default = False
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
