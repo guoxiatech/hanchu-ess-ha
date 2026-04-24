@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ class WorkModeSelect(CoordinatorEntity, SelectEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "work_mode"
     _attr_icon = "mdi:tune"
-    _attr_entity_registry_visible_default = False
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)
