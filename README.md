@@ -1,62 +1,81 @@
 # Hanchuess Home Assistant Integration
 
-Home Assistant自定义集成，用于监控和控制Hanchuess设备。
+A custom Home Assistant integration for monitoring and controlling Hanchuess ESS (Energy Storage System) devices.
 
-## 功能特性
+## Features
 
-- 实时监控设备状态
-- 显示设备版本、构建时间等信息
-- 支持充电/放电控制
-- 支持逆变器开关控制
-- 支持多设备管理
+- **Real-time Monitoring** — Battery SOC, PV power, grid power, load power, battery power, generator power (if available)
+- **Daily Energy Statistics** — PV generation, battery charge/discharge, grid import/export, load consumption, generator energy (if available)
+- **Energy Settings Card** — Custom Lovelace card for configuring work modes, charge/discharge time periods, and related parameters
+- **Fast Charge/Discharge** — Quick charge or discharge with configurable duration and one-click stop
+- **Multi-device Support** — Manage multiple inverters under one account
+- **Internationalization** — English and Simplified Chinese UI
 
-## 安装方法
+## Installation
 
-### 方法1：通过HACS安装（推荐）
+### Via HACS (Recommended)
 
-1. 确保已安装[HACS](https://hacs.xyz/)
-2. 在HACS中点击"集成"
-3. 点击右上角菜单，选择"自定义存储库"
-4. 添加此仓库URL：`https://github.com/你的用户名/hanchuess-ha`
-5. 类别选择"Integration"
-6. 搜索"Hanchuess"并安装
-7. 重启Home Assistant
+1. Make sure [HACS](https://hacs.xyz/) is installed
+2. Go to HACS → Integrations
+3. Click the top-right menu → Custom repositories
+4. Add this repository URL, category: Integration
+5. Search for "Hanchuess" and install
+6. Restart Home Assistant
 
-### 方法2：手动安装
+### Manual Installation
 
-1. 下载此仓库
-2. 将`custom_components/device_monitor`文件夹复制到Home Assistant的`config/custom_components/`目录
-3. 重启Home Assistant
+1. Download this repository
+2. Copy the folder to `config/custom_components/hanchuess/`
+3. Restart Home Assistant
 
-## 配置
+## Configuration
 
-1. 进入"设置 → 设备与服务 → 添加集成"
-2. 搜索"Hanchuess"
-3. 输入以下信息：
-   - 认证接口地址
-   - 状态查询接口地址
-   - API密钥
-   - 设备ID
-4. 点击提交完成配置
+1. Go to **Settings → Devices & Services → Add Integration**
+2. Search for **Hanchuess**
+3. Enter your Hanchuess account credentials
+4. Select the devices you want to add
+5. Done
 
-## 支持的实体
+## Entities
 
-### 传感器
-- 状态
-- 版本号
-- 构建时间
-- Pod名称
-- 服务名称
-- 启动时间
-- 当前时间
+### Sensors (Real-time, updated every 60s)
 
-### 按钮
-- 开启放电
-- 开启充电
+| Entity | Description |
+|---|---|
+| Device Status | Online / Offline / Pending |
+| Battery SOC | Battery state of charge (%) |
+| Battery Power | Battery charge/discharge power (W) |
+| PV Power | Solar photovoltaic power (W) |
+| Grid Power | Grid import/export power (W) |
+| Load Power | Home load power (W) |
+| Generator Power | Diesel generator power (W) — only if device has generator |
 
-### 开关
-- 逆变器开关
+### Sensors (Statistics, updated every 5min)
 
-## 许可证
+| Entity | Description |
+|---|---|
+| Daily Load Energy | Today's load consumption (kWh) |
+| Daily PV Energy | Today's PV generation (kWh) |
+| Daily Charge Energy | Today's battery charge (kWh) |
+| Daily Discharge Energy | Today's battery discharge (kWh) |
+| Daily Grid Import | Today's grid import (kWh) |
+| Daily Grid Export | Today's grid export (kWh) |
+| Daily Generator Energy | Today's generator output (kWh) — only if device has generator |
+
+### Select
+
+| Entity | Description |
+|---|---|
+| Work Mode | Inverter work mode selection |
+
+### Custom Lovelace Card
+
+The integration auto-registers a custom card **Hanchuess Energy Settings** which provides:
+
+- **SN display** at the top
+- **Fast Charge/Discharge** — Select mode (charge/discharge), set duration, confirm or stop with real-time countdown
+- **Energy Settings** — Load and configure work mode, charge/discharge time periods, SOC limits, and other parameters from the device menu
+
+## License
 
 MIT License
