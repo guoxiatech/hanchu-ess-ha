@@ -549,7 +549,7 @@ class HanchuessEnergyCard extends HTMLElement {
           input.value = Math.round(Number(result[signal]) / 60);
         } else {
           const step = parseFloat(input.dataset.step || "1");
-          input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : result[signal];
+          input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(result[signal]));
         }
       }
     });
@@ -574,7 +574,7 @@ class HanchuessEnergyCard extends HTMLElement {
         el.value = String(val);
       } else {
         const step = parseFloat(el.dataset.step || "1");
-        el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : String(val).replace(/"/g, "");
+        el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(val));
       }
     });
 
@@ -853,7 +853,7 @@ class HanchuessEnergyCard extends HTMLElement {
             input.value = Math.round(Number(result[signal]) / 60);
           } else {
             const step = parseFloat(input.dataset.step || "1");
-            input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : result[signal];
+            input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(result[signal]));
           }
         }
       });
@@ -882,7 +882,7 @@ class HanchuessEnergyCard extends HTMLElement {
           el.value = String(val);
         } else {
           const step = parseFloat(el.dataset.step || "1");
-          el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : String(val).replace(/"/g, "");
+          el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(val));
         }
       });
 
