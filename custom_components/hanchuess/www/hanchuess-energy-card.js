@@ -547,9 +547,12 @@ class HanchuessEnergyCard extends HTMLElement {
           input.checked = String(result[signal]) === (input.dataset.on || "1");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           input.value = Math.round(Number(result[signal]) / 60);
+        } else if (input.type === "number" && input.dataset.step) {
+          const step = parseFloat(input.dataset.step);
+          const num = Number(result[signal]);
+          input.value = isNaN(num) ? result[signal] : (step < 1 ? parseFloat(num.toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(num));
         } else {
-          const step = parseFloat(input.dataset.step || "1");
-          input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(result[signal]));
+          input.value = result[signal];
         }
       }
     });
@@ -572,9 +575,12 @@ class HanchuessEnergyCard extends HTMLElement {
         el.value = s.slice(0,2) + ":" + s.slice(2,4);
       } else if (el.tagName === "SELECT") {
         el.value = String(val);
+      } else if (el.type === "number" && el.dataset.step) {
+        const step = parseFloat(el.dataset.step);
+        const num = Number(val);
+        el.value = isNaN(num) ? val : (step < 1 ? parseFloat(num.toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(num));
       } else {
-        const step = parseFloat(el.dataset.step || "1");
-        el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(val));
+        el.value = String(val).replace(/"/g, "");
       }
     });
 
@@ -851,9 +857,12 @@ class HanchuessEnergyCard extends HTMLElement {
             input.checked = String(result[signal]) === (input.dataset.on || "1");
           } else if (signal === "MIN_THRESH_CHG_DUR") {
             input.value = Math.round(Number(result[signal]) / 60);
+          } else if (input.type === "number" && input.dataset.step) {
+            const step = parseFloat(input.dataset.step);
+            const num = Number(result[signal]);
+            input.value = isNaN(num) ? result[signal] : (step < 1 ? parseFloat(num.toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(num));
           } else {
-            const step = parseFloat(input.dataset.step || "1");
-            input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(result[signal]));
+            input.value = result[signal];
           }
         }
       });
@@ -881,8 +890,13 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (el.tagName === "SELECT") {
           el.value = String(val);
         } else {
-          const step = parseFloat(el.dataset.step || "1");
-          el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(Number(val));
+          if (el.type === "number" && el.dataset.step) {
+            const step = parseFloat(el.dataset.step);
+            const num = Number(val);
+            el.value = isNaN(num) ? val : (step < 1 ? parseFloat(num.toFixed(String(step).split(".")[1]?.length || 2)) : Math.round(num));
+          } else {
+            el.value = String(val).replace(/"/g, "");
+          }
         }
       });
 
@@ -992,10 +1006,14 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           newVal = String(Number(input.value) * 60);
         } else {
-          const step = parseFloat(input.dataset.step || "1");
-          newVal = step < 1 ? String(parseFloat(Number(input.value).toFixed(String(step).split(".")[1]?.length || 2))) : input.value;
+          newVal = input.value;
         }
-        const origVal = String(this._originalValues[signal] || "");
+        let origVal = String(this._originalValues[signal] || "");
+        if (input.type === "number" && input.dataset.step) {
+          const step = parseFloat(input.dataset.step);
+          const origNum = Number(origVal);
+          if (!isNaN(origNum)) origVal = step < 1 ? String(parseFloat(origNum.toFixed(String(step).split(".")[1]?.length || 2))) : String(Math.round(origNum));
+        }
         if (newVal !== origVal) changedSignals.add(signal);
       });
     });
@@ -1029,8 +1047,7 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           valueMap[signal] = String(Number(input.value) * 60);
         } else {
-          const step = parseFloat(input.dataset.step || "1");
-          valueMap[signal] = step < 1 ? String(parseFloat(Number(input.value).toFixed(String(step).split(".")[1]?.length || 2))) : input.value;
+          valueMap[signal] = input.value;
         }
       });
     });
