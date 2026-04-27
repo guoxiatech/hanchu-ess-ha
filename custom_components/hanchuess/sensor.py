@@ -156,6 +156,12 @@ def _parse_energy_menu(menu_data: dict) -> dict:
             if item_type == "1":
                 field["min"] = item.get("minVal", "")
                 field["max"] = item.get("maxVal", "")
+                def_fmt = item.get("defFmt", "")
+                if def_fmt and "." in def_fmt:
+                    decimals = len(def_fmt.split(".")[-1])
+                    field["step"] = round(10 ** -decimals, decimals)
+                else:
+                    field["step"] = 1
             if item_type == "3":
                 try:
                     field["options"] = json.loads(item.get("optVal", "[]"))
@@ -182,6 +188,12 @@ def _parse_energy_menu(menu_data: dict) -> dict:
                         except (json.JSONDecodeError, ValueError):
                             c["min"] = child.get("minVal", "0")
                             c["max"] = child.get("maxVal", "99999")
+                        child_fmt = child.get("defFmt", "")
+                        if child_fmt and "." in child_fmt:
+                            dec = len(child_fmt.split(".")[-1])
+                            c["step"] = round(10 ** -dec, dec)
+                        else:
+                            c["step"] = 1
                     if ct == "3":
                         try:
                             c["options"] = json.loads(child.get("optVal", "[]"))

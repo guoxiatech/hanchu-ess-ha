@@ -3,11 +3,11 @@ const HANCHUESS_I18N = {
   en: {
     device: "Device",
     select_device: "Select device",
-    energy_settings: "Energy Settings",
+    energy_settings: "Energy Setup",
     quick_charge: "Quick Charge/Discharge",
     mode: "Mode",
-    charge: "Charge",
-    discharge: "Discharge",
+    charge: "Charging",
+    discharge: "Discharging",
     stop: "Stop",
     duration_min: "Duration(min)",
     confirm: "Confirm",
@@ -457,7 +457,8 @@ class HanchuessEnergyCard extends HTMLElement {
 
       if (field.type === "1") {
         const min = field.min || "0", max = field.max || "99999";
-        html += `<div class="${cls}" ${la} data-signal="${field.signal}"><div class="field"><label>${field.name}</label><input type="number" data-signal="${field.signal}" min="${min}" max="${max}" placeholder="[${min}, ${max}]"></div></div>`;
+        const step = field.step || 1;
+        html += `<div class="${cls}" ${la} data-signal="${field.signal}"><div class="field"><label>${field.name}</label><input type="number" data-signal="${field.signal}" data-step="${step}" min="${min}" max="${max}" step="${step}" placeholder="[${min}, ${max}]"></div></div>`;
       }
 
       if (field.type === "6") {
@@ -481,8 +482,8 @@ class HanchuessEnergyCard extends HTMLElement {
           } else if (c.type === "5") {
             bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="time" data-arr-signal="${sig}" data-arr-index="${ci}" data-arr-fmt="time"></div>`;
           } else if (c.type === "1") {
-            const mn = c.min||"0", mx = c.max||"99999";
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="number" data-arr-signal="${sig}" data-arr-index="${ci}" min="${mn}" max="${mx}" placeholder="[${mn}, ${mx}]"></div>`;
+            const mn = c.min||"0", mx = c.max||"99999", cStep = c.step||1;
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="number" data-arr-signal="${sig}" data-arr-index="${ci}" data-step="${cStep}" min="${mn}" max="${mx}" step="${cStep}" placeholder="[${mn}, ${mx}]"></div>`;
           }
         }
         // "是否应用" from FLAG_ENABLE_CYCLE, not from array
@@ -547,7 +548,8 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           input.value = Math.round(Number(result[signal]) / 60);
         } else {
-          input.value = result[signal];
+          const step = parseFloat(input.dataset.step || "1");
+          input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : result[signal];
         }
       }
     });
@@ -571,7 +573,8 @@ class HanchuessEnergyCard extends HTMLElement {
       } else if (el.tagName === "SELECT") {
         el.value = String(val);
       } else {
-        el.value = String(val).replace(/"/g, "");
+        const step = parseFloat(el.dataset.step || "1");
+        el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : String(val).replace(/"/g, "");
       }
     });
 
@@ -849,7 +852,8 @@ class HanchuessEnergyCard extends HTMLElement {
           } else if (signal === "MIN_THRESH_CHG_DUR") {
             input.value = Math.round(Number(result[signal]) / 60);
           } else {
-            input.value = result[signal];
+            const step = parseFloat(input.dataset.step || "1");
+            input.value = step < 1 ? parseFloat(Number(result[signal]).toFixed(String(step).split(".")[1]?.length || 2)) : result[signal];
           }
         }
       });
@@ -877,7 +881,8 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (el.tagName === "SELECT") {
           el.value = String(val);
         } else {
-          el.value = String(val).replace(/"/g, "");
+          const step = parseFloat(el.dataset.step || "1");
+          el.value = step < 1 ? parseFloat(Number(val).toFixed(String(step).split(".")[1]?.length || 2)) : String(val).replace(/"/g, "");
         }
       });
 
@@ -987,7 +992,8 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           newVal = String(Number(input.value) * 60);
         } else {
-          newVal = input.value;
+          const step = parseFloat(input.dataset.step || "1");
+          newVal = step < 1 ? String(parseFloat(Number(input.value).toFixed(String(step).split(".")[1]?.length || 2))) : input.value;
         }
         const origVal = String(this._originalValues[signal] || "");
         if (newVal !== origVal) changedSignals.add(signal);
@@ -1023,7 +1029,8 @@ class HanchuessEnergyCard extends HTMLElement {
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           valueMap[signal] = String(Number(input.value) * 60);
         } else {
-          valueMap[signal] = input.value;
+          const step = parseFloat(input.dataset.step || "1");
+          valueMap[signal] = step < 1 ? String(parseFloat(Number(input.value).toFixed(String(step).split(".")[1]?.length || 2))) : input.value;
         }
       });
     });
