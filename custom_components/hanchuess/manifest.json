@@ -1,11 +1,11 @@
 {
   "domain": "hanchuess",
   "name": "Hanchuess",
-  "documentation": "https://github.com/yourusername/hanchu-ess-ha",
+  "documentation": "https://github.com/guoxiatech/hanchu-ess-ha",
   "requirements": [],
   "dependencies": ["frontend", "http", "websocket_api"],
   "codeowners": [],
-  "version": "1.0.9",
+  "version": "1.0.10",
   "iot_class": "cloud_polling",
   "config_flow": true,
   "integration_type": "device"
