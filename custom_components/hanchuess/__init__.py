@@ -87,6 +87,14 @@ async def ws_iot_set(hass, connection, msg):
     dev_type = msg["dev_type"]
     value = msg["value"]
 
+    # Convert numeric string values to int
+    for k, v in value.items():
+        if isinstance(v, str):
+            try:
+                value[k] = int(v)
+            except ValueError:
+                pass
+
     target_client = None
     for eid, data in hass.data[DOMAIN].items():
         if isinstance(data, dict) and "realtime" in data:
