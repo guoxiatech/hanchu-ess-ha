@@ -466,7 +466,8 @@ class HanchuessEnergyCard extends HTMLElement {
         const code = field.code || "";
         const gk = code.startsWith("chg_tim") ? "chg" : code.startsWith("dschg_tim") ? "dschg" : code;
         const idx = (code.match(/(\d)$/) || [,"1"])[1];
-        html += `<div class="${cls}" ${la} data-signal="${field.signal}" data-time-group="${gk}" data-time-index="${idx}"><div class="time-row"><span class="time-label">${field.name}</span><input type="time" data-signal="${sigs[0]||""}"><span>-</span><input type="time" data-signal="${sigs[1]||""}"><button class="icon-btn del" data-action="del-time" data-group="${gk}" data-index="${idx}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${gk}" data-index="${idx}" style="display:none">+</button></div></div>`;
+        const fmt = field.format || "";
+        html += `<div class="${cls}" ${la} data-signal="${field.signal}" data-time-group="${gk}" data-time-index="${idx}" data-time-fmt="${fmt}"><div class="time-row"><span class="time-label">${field.name}</span><input type="time" data-signal="${sigs[0]||""}"><span>-</span><input type="time" data-signal="${sigs[1]||""}"><button class="icon-btn del" data-action="del-time" data-group="${gk}" data-index="${idx}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${gk}" data-index="${idx}" style="display:none">+</button></div></div>`;
       }
 
       if (field.type === "collapse") {
@@ -541,8 +542,15 @@ class HanchuessEnergyCard extends HTMLElement {
         if (input.type === "time") {
           const v = String(result[signal]);
           if (v.includes(":")) input.value = v;
-          else if (v.length <= 4) { const s = v.padStart(4, "0"); input.value = s.slice(0,2) + ":" + s.slice(2,4); }
-          else input.value = this._signalToTime(result[signal]);
+          else {
+            const fmt = input.closest("[data-time-fmt]")?.dataset.timeFmt || "";
+            if (fmt.includes("HH") || fmt.includes("hh")) {
+              input.value = this._signalToTime(result[signal]);
+            } else {
+              const s = v.padStart(4, "0");
+              input.value = s.slice(0,2) + ":" + s.slice(2,4);
+            }
+          }
         } else if (input.type === "checkbox") {
           input.checked = String(result[signal]) === (input.dataset.on || "1");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
@@ -847,11 +855,14 @@ class HanchuessEnergyCard extends HTMLElement {
             const v = String(result[signal]);
             if (v.includes(":")) {
               input.value = v;
-            } else if (v.length <= 4) {
-              const s = v.padStart(4, "0");
-              input.value = s.slice(0,2) + ":" + s.slice(2,4);
             } else {
-              input.value = this._signalToTime(result[signal]);
+              const fmt = input.closest("[data-time-fmt]")?.dataset.timeFmt || "";
+              if (fmt.includes("HH") || fmt.includes("hh")) {
+                input.value = this._signalToTime(result[signal]);
+              } else {
+                const s = v.padStart(4, "0");
+                input.value = s.slice(0,2) + ":" + s.slice(2,4);
+              }
             }
           } else if (input.type === "checkbox") {
             input.checked = String(result[signal]) === (input.dataset.on || "1");
@@ -932,7 +943,7 @@ class HanchuessEnergyCard extends HTMLElement {
       timeSlots.forEach(slot => {
         const timeInputs = slot.querySelectorAll("input[type='time']");
         const allZero = Array.from(timeInputs).every(inp => inp.value === "00:00");
-        if (allZero) {
+        if (allZero && slot.dataset.timeIndex !== "1") {
           slot.classList.remove("visible");
           slot.dataset.timeHidden = "true";
         } else {
@@ -1000,7 +1011,12 @@ class HanchuessEnergyCard extends HTMLElement {
         if (!signal) return;
         let newVal;
         if (input.type === "time") {
-          newVal = this._timeToSignal(input.value || "00:00");
+          const fmt = input.closest("[data-time-fmt]")?.dataset.timeFmt || "";
+          if (fmt.includes("HH") || fmt.includes("hh")) {
+            newVal = this._timeToSignal(input.value || "00:00");
+          } else {
+            newVal = (input.value || "00:00").replace(":", "");
+          }
         } else if (input.type === "checkbox") {
           newVal = input.checked ? (input.dataset.on || "1") : (input.dataset.off || "0");
         } else if (signal === "MIN_THRESH_CHG_DUR") {
@@ -1008,6 +1024,7 @@ class HanchuessEnergyCard extends HTMLElement {
         } else {
           newVal = input.value;
         }
+        if (!newVal && !this._originalValues[signal]) return;
         let origVal = String(this._originalValues[signal] || "");
         if (input.type === "number" && input.dataset.step) {
           const step = parseFloat(input.dataset.step);
@@ -1043,7 +1060,12 @@ class HanchuessEnergyCard extends HTMLElement {
         const signal = input.dataset.signal;
         if (!signal) return;
         if (input.type === "time") {
-          valueMap[signal] = this._timeToSignal(input.value || "00:00");
+          const fmt = input.closest("[data-time-fmt]")?.dataset.timeFmt || "";
+          if (fmt.includes("HH") || fmt.includes("hh")) {
+            valueMap[signal] = this._timeToSignal(input.value || "00:00");
+          } else {
+            valueMap[signal] = (input.value || "00:00").replace(":", "");
+          }
         } else if (signal === "MIN_THRESH_CHG_DUR") {
           valueMap[signal] = String(Number(input.value) * 60);
         } else {
@@ -1125,6 +1147,24 @@ class HanchuessEnergyCard extends HTMLElement {
       });
 
       Object.assign(this._originalValues, valueMap);
+
+      // Sync all visible field values to _originalValues
+      container.querySelectorAll("input[data-signal]").forEach(input => {
+        const signal = input.dataset.signal;
+        if (!signal || !input.value) return;
+        if (input.type === "time") {
+          const fmt = input.closest("[data-time-fmt]")?.dataset.timeFmt || "";
+          if (fmt.includes("HH") || fmt.includes("hh")) {
+            this._originalValues[signal] = this._timeToSignal(input.value || "00:00");
+          } else {
+            this._originalValues[signal] = (input.value || "00:00").replace(":", "");
+          }
+        } else if (signal === "MIN_THRESH_CHG_DUR") {
+          this._originalValues[signal] = String(Number(input.value) * 60);
+        } else {
+          this._originalValues[signal] = input.value;
+        }
+      });
 
       statusMsg.textContent = _t(this._hass, 'submit_success');
       statusMsg.className = "status success";

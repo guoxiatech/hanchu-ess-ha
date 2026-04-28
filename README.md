@@ -6,9 +6,9 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 
 - **Real-time Monitoring** — Battery SOC, PV power, grid power, load power, battery power, generator power (if available)
 - **Daily Energy Statistics** — PV generation, battery charge/discharge, grid import/export, load consumption, generator energy (if available)
-- **Energy Settings Card** — Custom Lovelace card for configuring work modes, charge/discharge time periods, and related parameters
+- **Remote Settings Card** — Custom Lovelace card for configuring work modes, charge/discharge time periods, and related parameters
 - **Fast Charge/Discharge** — Quick charge or discharge with configurable duration and one-click stop
-- **Multi-device Support** — Manage multiple inverters under one account
+- **Multi-device Support** — Manage multiple devices under one account
 - **Internationalization** — English and Simplified Chinese UI
 
 ## Installation
@@ -62,19 +62,19 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 | Daily Grid Export | Today's grid export (kWh) |
 | Daily Generator Energy | Today's generator output (kWh) — only if device has generator |
 
-### Select
+## Custom Lovelace Card
 
-| Entity | Description |
-|---|---|
-| Work Mode | Inverter work mode selection |
+The integration auto-registers a custom card **Hanchuess Remote Settings** which can be found under **Custom cards** when adding a card to your dashboard.
 
-### Custom Lovelace Card
+![Custom Card](docs/card-picker.png)
 
-The integration auto-registers a custom card **Hanchuess Energy Settings** which provides:
+The card provides:
 
 - **SN display** at the top
 - **Fast Charge/Discharge** — Select mode (charge/discharge), set duration, confirm or stop with real-time countdown
 - **Energy Settings** — Load and configure work mode, charge/discharge time periods, SOC limits, and other parameters from the device menu
+
+> **Note:** If you cannot find the Hanchuess card when adding to dashboard, please clear your browser cache and refresh the page, or restart Home Assistant.
 
 ## License
 

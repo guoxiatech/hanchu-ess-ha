@@ -279,7 +279,7 @@ class HanchueSensor(CoordinatorEntity, SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.data["sn"])},
             name=f"Hanchuess {self._entry.data['sn']}",
-            manufacturer="Hanchuess",
+            manufacturer="Hanchu",
             model="ESS Device",
         )
 
@@ -314,7 +314,7 @@ class DeviceStatusSensor(CoordinatorEntity, SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.data["sn"])},
             name=f"Hanchuess {self._entry.data['sn']}",
-            manufacturer="Hanchuess",
+            manufacturer="Hanchu",
             model="ESS Device",
         )
 
