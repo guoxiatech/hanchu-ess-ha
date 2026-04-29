@@ -33,7 +33,9 @@ class HanchuessRealtimeCoordinator(DataUpdateCoordinator):
 
         try:
             if self.client.should_refresh_token():
-                await self.client.async_refresh_token()
+                new_token = await self.client.async_refresh_token()
+                if new_token:
+                    self._update_entry_token(new_token)
         except ReauthRequired:
             raise ConfigEntryAuthFailed("Token refresh returned 90076, reauth required")
 
