@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from .api import HanchuessApiClient, ReauthRequired
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,9 +56,10 @@ class HanchuessRealtimeCoordinator(DataUpdateCoordinator):
         return data
 
     def _update_entry_token(self, token: str):
-        self.hass.config_entries.async_update_entry(
-            self.entry, data={**self.entry.data, "token": token}
-        )
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, "token": token}
+            )
 
 
 class HanchuessStatisticsCoordinator(DataUpdateCoordinator):
@@ -96,6 +98,7 @@ class HanchuessStatisticsCoordinator(DataUpdateCoordinator):
         return data
 
     def _update_entry_token(self, token: str):
-        self.hass.config_entries.async_update_entry(
-            self.entry, data={**self.entry.data, "token": token}
-        )
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, "token": token}
+            )

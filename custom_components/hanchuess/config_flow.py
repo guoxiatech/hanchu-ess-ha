@@ -145,14 +145,20 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input["account"], user_input["password"]
             )
             if token:
-                entry = self.hass.config_entries.async_get_entry(
-                    self.context["entry_id"]
-                )
-                self.hass.config_entries.async_update_entry(
-                    entry,
-                    data={**entry.data, "token": token},
-                )
-                await self.hass.config_entries.async_reload(entry.entry_id)
+                # Update token for ALL entries and shared client
+                for entry in self.hass.config_entries.async_entries(DOMAIN):
+                    self.hass.config_entries.async_update_entry(
+                        entry, data={**entry.data, "token": token}
+                    )
+                # Update shared client
+                domain_data = self.hass.data.get(DOMAIN, {})
+                if "_client" in domain_data:
+                    domain_data["_client"]._token = token
+                    import time
+                    domain_data["_client"]._token_time = time.time()
+                # Reload all entries
+                for entry in self.hass.config_entries.async_entries(DOMAIN):
+                    await self.hass.config_entries.async_reload(entry.entry_id)
                 return self.async_abort(reason="reauth_successful")
             errors["base"] = "auth_failed"
 

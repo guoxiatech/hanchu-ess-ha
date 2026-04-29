@@ -162,10 +162,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as err:
             _LOGGER.warning("[HANCHUESS] Card resource auto-register failed: %s", err)
 
-    client = HanchuessApiClient(
-        domain=BASE_URL,
-        token=entry.data.get("token"),
-    )
+    # Share a single client across all entries
+    if "_client" not in hass.data[DOMAIN]:
+        hass.data[DOMAIN]["_client"] = HanchuessApiClient(
+            domain=BASE_URL,
+            token=entry.data.get("token"),
+        )
+    client = hass.data[DOMAIN]["_client"]
 
     coordinator = HanchuessRealtimeCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
@@ -230,4 +233,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
+        # Remove shared client if no entries left
+        has_entries = any(
+            k for k, v in hass.data[DOMAIN].items()
+            if isinstance(v, dict) and "realtime" in v
+        )
+        if not has_entries:
+            hass.data[DOMAIN].pop("_client", None)
     return unload_ok
