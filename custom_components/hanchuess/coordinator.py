@@ -14,8 +14,28 @@ REALTIME_INTERVAL = timedelta(seconds=60)
 STATISTICS_INTERVAL = timedelta(minutes=5)
 
 
+def _raise_auth_failed(client: HanchuessApiClient, msg: str):
+    """Raise ConfigEntryAuthFailed once, UpdateFailed for the rest."""
+    if not client._reauth_triggered:
+        client._reauth_triggered = True
+        raise ConfigEntryAuthFailed(msg)
+    raise UpdateFailed(msg)
+
+
+async def _try_refresh(client, update_cb, force=False):
+    """Try to refresh token. Returns True if refreshed, raises on reauth needed."""
+    try:
+        new_token = await client.async_refresh_token(force=force)
+    except ReauthRequired:
+        _raise_auth_failed(client, "Token refresh returned 90076, reauth required")
+    if new_token:
+        update_cb(new_token)
+        return True
+    return False
+
+
 class HanchuessRealtimeCoordinator(DataUpdateCoordinator):
-    """Realtime data coordinator (30s)."""
+    """Realtime data coordinator (60s)."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, client: HanchuessApiClient):
         super().__init__(
@@ -31,27 +51,20 @@ class HanchuessRealtimeCoordinator(DataUpdateCoordinator):
         sn = self.entry.data["sn"]
         language = self.hass.config.language or "en"
 
-        try:
-            if self.client.should_refresh_token():
-                new_token = await self.client.async_refresh_token()
-                if new_token:
-                    self._update_entry_token(new_token)
-        except ReauthRequired:
-            raise ConfigEntryAuthFailed("Token refresh returned 90076, reauth required")
+        # Proactive refresh at 25 days
+        if self.client.should_refresh_token():
+            await _try_refresh(self.client, self._update_entry_token)
 
         data = await self.client.async_get_device_status(sn, language)
 
+        # Reactive refresh on 401
         if data and data.get("_token_expired"):
-            try:
-                new_token = await self.client.async_refresh_token()
-            except ReauthRequired:
-                raise ConfigEntryAuthFailed("Token refresh returned 90076, reauth required")
-            if new_token:
-                self._update_entry_token(new_token)
+            refreshed = await _try_refresh(self.client, self._update_entry_token, force=True)
+            if refreshed:
                 data = await self.client.async_get_device_status(sn, language)
 
         if data and data.get("_token_expired"):
-            raise ConfigEntryAuthFailed("Token expired and refresh failed")
+            _raise_auth_failed(self.client, "Token expired and refresh failed")
 
         if not data:
             raise UpdateFailed("Failed to get device status")
@@ -84,16 +97,12 @@ class HanchuessStatisticsCoordinator(DataUpdateCoordinator):
         data = await self.client.async_get_device_statistics(sn, language)
 
         if data and data.get("_token_expired"):
-            try:
-                new_token = await self.client.async_refresh_token()
-            except ReauthRequired:
-                raise ConfigEntryAuthFailed("Token refresh returned 90076, reauth required")
-            if new_token:
-                self._update_entry_token(new_token)
+            refreshed = await _try_refresh(self.client, self._update_entry_token, force=True)
+            if refreshed:
                 data = await self.client.async_get_device_statistics(sn, language)
 
         if data and data.get("_token_expired"):
-            raise ConfigEntryAuthFailed("Token expired and refresh failed")
+            _raise_auth_failed(self.client, "Token expired and refresh failed")
 
         if not data:
             raise UpdateFailed("Failed to get device statistics")

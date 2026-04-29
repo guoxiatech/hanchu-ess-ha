@@ -1,5 +1,6 @@
 """Config flow for Hanchuess."""
 import logging
+import time
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant import config_entries
@@ -18,18 +19,14 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         """Step 1: Login."""
-        # Check if already logged in
+        # Check if already logged in — use shared client directly
         existing = self.hass.data.get(DOMAIN, {})
-        for entry_data in existing.values():
-            if isinstance(entry_data, dict) and "realtime" in entry_data:
-                coordinator = entry_data["realtime"]
-                if coordinator.client.token:
-                    self._token = coordinator.client.token
-                    client = HanchuessApiClient(BASE_URL, self._token)
-                    self._devices = await client.async_get_devices()
-                    if self._devices:
-                        return await self.async_step_select_device()
-                    break
+        shared_client = existing.get("_client")
+        if shared_client and shared_client.token:
+            self._token = shared_client.token
+            self._devices = await shared_client.async_get_devices()
+            if self._devices:
+                return await self.async_step_select_device()
 
         errors = {}
         if user_input is not None:
@@ -154,11 +151,13 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 domain_data = self.hass.data.get(DOMAIN, {})
                 if "_client" in domain_data:
                     domain_data["_client"]._token = token
-                    import time
                     domain_data["_client"]._token_time = time.time()
-                # Reload all entries
+                    domain_data["_client"]._reauth_triggered = False
+                # Schedule reload for all entries (non-blocking)
                 for entry in self.hass.config_entries.async_entries(DOMAIN):
-                    await self.hass.config_entries.async_reload(entry.entry_id)
+                    self.hass.async_create_task(
+                        self.hass.config_entries.async_reload(entry.entry_id)
+                    )
                 return self.async_abort(reason="reauth_successful")
             errors["base"] = "auth_failed"
 

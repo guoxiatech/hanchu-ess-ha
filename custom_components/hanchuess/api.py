@@ -1,4 +1,5 @@
 """API client for Hanchuess."""
+import asyncio
 import logging
 import time
 import aiohttp
@@ -21,6 +22,9 @@ class HanchuessApiClient:
         self._domain = domain.rstrip("/")
         self._token = token
         self._token_time = time.time() if token else 0
+        self._refresh_lock = asyncio.Lock()
+        self._reauth_triggered = False
+        self._last_refresh_attempt = 0
 
     @property
     def token(self) -> str:
@@ -76,20 +80,28 @@ class HanchuessApiClient:
             return self._token
         return None
 
-    async def async_refresh_token(self) -> str | None:
-        """Refresh token. Returns new token, None on failure, or raises ReauthRequired on 90076."""
-        result = await self._request(
-            "/gateway/identify/auth/token/refresh",
-            {"token": self._token},
-        )
-        if result and result.get("success"):
-            self._token = result.get("data")
-            self._token_time = time.time()
-            return self._token
-        if result and result.get("code") == 100 and "90076" in str(result.get("msg", "")):
-            _LOGGER.warning("[HANCHUESS] refresh_token returned 90076, reauth required")
-            raise ReauthRequired()
-        return None
+    async def async_refresh_token(self, force: bool = False) -> str | None:
+        """Refresh token with lock to prevent concurrent refresh calls."""
+        async with self._refresh_lock:
+            # Proactive: skip if not yet due (another coroutine may have refreshed)
+            if not force and not self.should_refresh_token():
+                return self._token
+            # Reactive: skip if token was already refreshed/attempted recently
+            if force and (time.time() - self._last_refresh_attempt) < 30:
+                return self._token if not self.should_refresh_token() else None
+            self._last_refresh_attempt = time.time()
+            result = await self._request(
+                "/gateway/identify/auth/token/refresh",
+                {"token": self._token},
+            )
+            if result and result.get("success"):
+                self._token = result.get("data")
+                self._token_time = time.time()
+                return self._token
+            if result and result.get("code") == 100 and "90076" in str(result.get("msg", "")):
+                _LOGGER.warning("[HANCHUESS] refresh_token returned 90076, reauth required")
+                raise ReauthRequired()
+            return None
 
     def should_refresh_token(self) -> bool:
         return (time.time() - self._token_time) >= TOKEN_REFRESH_SECONDS
@@ -98,9 +110,11 @@ class HanchuessApiClient:
         result = await self._request(
             "/gateway/app/ha/getDeviceList", {}
         )
-        _LOGGER.info("[HANCHUESS] getDeviceList: %d devices", len(result.get("data", [])) if result else 0)
         if result and result.get("success"):
-            return result.get("data", [])
+            devices = result.get("data", [])
+            _LOGGER.info("[HANCHUESS] getDeviceList: %d devices", len(devices))
+            return devices
+        _LOGGER.info("[HANCHUESS] getDeviceList: 0 devices")
         return []
 
     async def async_get_device_status(self, sn: str, language: str = "en") -> dict | None:

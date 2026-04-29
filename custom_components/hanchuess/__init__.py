@@ -174,10 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     stats_coordinator = HanchuessStatisticsCoordinator(hass, entry, client)
-    try:
-        await stats_coordinator.async_config_entry_first_refresh()
-    except Exception:
-        _LOGGER.warning("[HANCHUESS] Statistics first refresh failed, will retry later")
+    await stats_coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {
         "realtime": coordinator,
@@ -233,11 +230,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        # Remove shared client if no entries left
-        has_entries = any(
-            k for k, v in hass.data[DOMAIN].items()
-            if isinstance(v, dict) and "realtime" in v
-        )
-        if not has_entries:
-            hass.data[DOMAIN].pop("_client", None)
     return unload_ok
