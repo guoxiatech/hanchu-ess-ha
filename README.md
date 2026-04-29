@@ -62,6 +62,22 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 | Daily Grid Export | Today's grid export (kWh) |
 | Daily Generator Energy | Today's generator output (kWh) — only if device has generator |
 
+## Token Expiration & Re-authentication
+
+The Hanchuess cloud token has a limited validity period. When the token expires, the integration will automatically attempt to refresh it. If the refresh fails, all device entities will become **Unavailable**:
+
+![Entities Unavailable](docs/reauth-unavailable.png)
+
+When this happens, go to **Settings** — you will see a repair notification at the top of the page:
+
+![Repair Notification](docs/reauth-repair.png)
+
+Click the repair item, then re-enter your Hanchuess account and password in the dialog and click **Submit**:
+
+![Re-authenticate](docs/reauth-login.png)
+
+After successful authentication, all devices will automatically recover and start reporting data again. If you have multiple devices, you only need to authenticate once — all devices share the same token.
+
 ## Custom Lovelace Card
 
 The integration auto-registers a custom card **Hanchuess Remote Settings** which can be found under **Custom cards** when adding a card to your dashboard.

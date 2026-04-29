@@ -98,8 +98,8 @@ class HanchuessApiClient:
                 self._token = result.get("data")
                 self._token_time = time.time()
                 return self._token
-            if result and result.get("code") == 100 and "90076" in str(result.get("msg", "")):
-                _LOGGER.warning("[HANCHUESS] refresh_token returned 90076, reauth required")
+            if result and result.get("code") == 100:
+                _LOGGER.warning("[HANCHUESS] refresh_token failed: code=100, msg=%s", result.get("msg"))
                 raise ReauthRequired()
             return None
 
