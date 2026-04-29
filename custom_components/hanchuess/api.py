@@ -10,6 +10,10 @@ TOKEN_REFRESH_DAYS = 25
 TOKEN_REFRESH_SECONDS = TOKEN_REFRESH_DAYS * 24 * 3600
 
 
+class ReauthRequired(Exception):
+    """Raised when refresh_token returns 90076, requiring re-authentication."""
+
+
 class HanchuessApiClient:
     """Hanchuess API client."""
 
@@ -73,6 +77,7 @@ class HanchuessApiClient:
         return None
 
     async def async_refresh_token(self) -> str | None:
+        """Refresh token. Returns new token, None on failure, or raises ReauthRequired on 90076."""
         result = await self._request(
             "/gateway/identify/auth/token/refresh",
             {"token": self._token},
@@ -81,6 +86,9 @@ class HanchuessApiClient:
             self._token = result.get("data")
             self._token_time = time.time()
             return self._token
+        if result and result.get("code") == 100 and "90076" in str(result.get("msg", "")):
+            _LOGGER.warning("[HANCHUESS] refresh_token returned 90076, reauth required")
+            raise ReauthRequired()
         return None
 
     def should_refresh_token(self) -> bool:

@@ -15,6 +15,14 @@
         "data": {
           "devices": "Devices"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Hanchuess",
+        "description": "Your token has expired. Please re-enter your credentials.",
+        "data": {
+          "account": "Account",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -23,7 +31,8 @@
       "no_devices": "No devices found under this account"
     },
     "abort": {
-      "already_configured": "This device is already configured"
+      "already_configured": "This device is already configured",
+      "reauth_successful": "Re-authentication successful"
     }
   },
   "entity": {

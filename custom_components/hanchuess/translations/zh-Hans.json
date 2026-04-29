@@ -15,6 +15,14 @@
         "data": {
           "devices": "设备"
         }
+      },
+      "reauth_confirm": {
+        "title": "重新认证 Hanchuess",
+        "description": "Token 已过期，请重新输入账号密码。",
+        "data": {
+          "account": "账号",
+          "password": "密码"
+        }
       }
     },
     "error": {
@@ -23,7 +31,8 @@
       "no_devices": "该账号下未找到设备"
     },
     "abort": {
-      "already_configured": "该设备已配置"
+      "already_configured": "该设备已配置",
+      "reauth_successful": "重新认证成功"
     }
   },
   "entity": {

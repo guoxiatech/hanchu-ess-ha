@@ -131,3 +131,36 @@ class HanchuessConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "pending_devices": [],
             },
         )
+
+    async def async_step_reauth(self, entry_data: dict):
+        """Handle reauth triggered by ConfigEntryAuthFailed."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Re-authenticate with user credentials."""
+        errors = {}
+        if user_input is not None:
+            client = HanchuessApiClient(BASE_URL)
+            token = await client.async_login(
+                user_input["account"], user_input["password"]
+            )
+            if token:
+                entry = self.hass.config_entries.async_get_entry(
+                    self.context["entry_id"]
+                )
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={**entry.data, "token": token},
+                )
+                await self.hass.config_entries.async_reload(entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
+            errors["base"] = "auth_failed"
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({
+                vol.Required("account"): str,
+                vol.Required("password"): str,
+            }),
+            errors=errors,
+        )
