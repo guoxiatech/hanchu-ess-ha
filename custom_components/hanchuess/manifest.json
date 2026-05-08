@@ -9,5 +9,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/guoxiatech/hanchu-ess-ha/issues",
   "requirements": [],
-  "version": "1.0.24"
+  "version": "1.0.25"
 }

@@ -11,6 +11,8 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 - **Multi-device Support** — Manage multiple devices under one account
 - **Internationalization** — English and Simplified Chinese UI
 
+
+
 ## Installation
 
 ### Via HACS (Recommended)
