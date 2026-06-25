@@ -6,6 +6,7 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 
 - **Real-time Monitoring** — Battery SOC, PV power, grid power, load power, battery power, generator power (if available)
 - **Daily Energy Statistics** — PV generation, battery charge/discharge, grid import/export, load consumption, generator energy (if available)
+- Service for **Fast Charge and Discharge** for use with Automations
 - **Remote Settings Card** — Custom Lovelace card for configuring work modes, charge/discharge time periods, and related parameters
 - **Fast Charge/Discharge** — Quick charge or discharge with configurable duration and one-click stop
 - **Multi-device Support** — Manage multiple devices under one account
@@ -48,6 +49,7 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 | Battery SOC | Battery state of charge (%) |
 | Battery Power | Battery charge/discharge power (W) |
 | PV Power | Solar photovoltaic power (W) |
+| Ext AC Power | AC Coupled Solar power (W) |
 | Grid Power | Grid import/export power (W) |
 | Load Power | Home load power (W) |
 | Generator Power | Diesel generator power (W) — only if device has generator |
@@ -63,6 +65,27 @@ A custom Home Assistant integration for monitoring and controlling Hanchuess ESS
 | Daily Grid Import | Today's grid import (kWh) |
 | Daily Grid Export | Today's grid export (kWh) |
 | Daily Generator Energy | Today's generator output (kWh) — only if device has generator |
+
+### Services
+
+The integration provides a single service, _hanchuess.fast_charge_ which provides a single step full power charge or discharge for the set time interval (like the Quick Execution button in the app)
+
+Used like this:
+```
+   service: hanchuess.fast_charge
+   data:
+     act: -3
+     duration: 120
+```
+
+with the duration in *seconds* and act code meaning
+
+| act | Action |
+|---|---|
+| 3 | Fast Discharge |
+| -3 | Stop Fast Discharge |
+| 2 | Fast Charge|
+| -2 | Stop Fast Charge |
 
 ## Token Expiration & Re-authentication
 

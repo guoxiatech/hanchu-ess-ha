@@ -209,6 +209,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN, SERVICE_DEVICE_CONTROL, handle_device_control, schema=SERVICE_SCHEMA
         )
 
+    # ⭐ NEW SERVICE GOES HERE — inside async_setup_entry
+    async def handle_fast_charge(call: ServiceCall):
+        # If user provided sn, use it; otherwise auto-detect
+        sn = call.data.get("sn")
+
+        if not sn:
+            # Find the first configured inverter
+            for eid, data in hass.data[DOMAIN].items():
+                if isinstance(data, dict) and "realtime" in data:
+                    sn = data["realtime"].entry.data.get("sn")
+                    break
+
+        if not sn:
+            _LOGGER.error("[HANCHUESS] fast_charge: No inverter serial found")
+            return
+
+        act = call.data["act"]
+        duration = call.data.get("duration", 0)
+
+        client = hass.data[DOMAIN]["_client"]
+        result = await client.async_fast_charge_discharge(sn, act, duration)
+
+        if not result.get("success"):
+            _LOGGER.error("[HANCHUESS] fast_charge failed: %s", result.get("msg"))
+            
+    hass.services.async_register(
+        DOMAIN,
+        "fast_charge",
+        handle_fast_charge,
+        schema=vol.Schema({
+            vol.Optional("sn"): cv.string,
+            vol.Required("act"): vol.All(int, vol.Range(min=-3, max=3)),
+            vol.Optional("duration"): vol.All(int, vol.Range(min=0)),
+        }),
+    )
+
+    # ⭐ END OF NEW SERVICE
+
     # Auto-create entries for remaining selected devices
     pending = entry.data.get("pending_devices", [])
     if pending:
@@ -226,7 +264,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.config_entries.async_update_entry(entry, data=new_data)
 
     return True
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
