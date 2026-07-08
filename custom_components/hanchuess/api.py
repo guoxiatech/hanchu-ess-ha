@@ -9,6 +9,23 @@ _LOGGER = logging.getLogger(__name__)
 
 TOKEN_REFRESH_DAYS = 25
 TOKEN_REFRESH_SECONDS = TOKEN_REFRESH_DAYS * 24 * 3600
+TOKEN_RESPONSE_PATHS = {
+    "/gateway/identify/auth/token",
+    "/gateway/identify/auth/token/refresh",
+}
+
+
+def _redact_response_body(path: str, result):
+    """Return a copy of an API response safe for logging."""
+    if not isinstance(result, dict):
+        return result
+    redacted = dict(result)
+    if path in TOKEN_RESPONSE_PATHS and "data" in redacted:
+        redacted["data"] = "***REDACTED***"
+    for key in ("token", "access_token", "accessToken", "refresh_token", "refreshToken"):
+        if key in redacted:
+            redacted[key] = "***REDACTED***"
+    return redacted
 
 
 class ReauthRequired(Exception):
@@ -54,14 +71,15 @@ class HanchuessApiClient:
                         url, json=data, headers=self._headers(language)
                     ) as response:
                         result = await response.json(content_type=None)
-                        _LOGGER.debug("[HANCHUESS] response: %s status=%s body=%s", path, response.status, str(result)[:500])
+                        log_result = _redact_response_body(path, result)
+                        _LOGGER.debug("[HANCHUESS] response: %s status=%s body=%s", path, response.status, str(log_result)[:500])
                         if response.status == 401:
                             return {"success": False, "code": 401}
                         if response.status == 200:
                             if result.get("code") == 401:
                                 return {"success": False, "code": 401}
                             return result
-                        _LOGGER.error("[HANCHUESS] unexpected status: %s %s", response.status, str(result)[:200])
+                        _LOGGER.error("[HANCHUESS] unexpected status: %s %s", response.status, str(log_result)[:200])
         except TimeoutError:
             _LOGGER.error("[HANCHUESS] Request timeout: %s", url)
         except Exception as err:

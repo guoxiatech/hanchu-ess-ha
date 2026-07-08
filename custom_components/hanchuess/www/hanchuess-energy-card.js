@@ -111,6 +111,19 @@ function _t(hass, key) {
   return (HANCHUESS_I18N[lang] && HANCHUESS_I18N[lang][key]) || HANCHUESS_I18N["en"][key] || key;
 }
 
+function _escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function _escapeCssString(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 // ===== Card Editor =====
 class HanchuessEnergyCardEditor extends HTMLElement {
   setConfig(config) {
@@ -138,7 +151,7 @@ class HanchuessEnergyCardEditor extends HTMLElement {
             const state = this._hass.states[eid];
             const name = (state.attributes.friendly_name || eid).replace(/ [Dd]evice [Ss]tatus| 设备状态/g, "");
             const selected = this._config.entity === eid ? "selected" : "";
-            return `<option value="${eid}" ${selected}>${name}</option>`;
+            return `<option value="${_escapeHtml(eid)}" ${selected}>${_escapeHtml(name)}</option>`;
           }).join("")}
         </select>
       </div>
@@ -732,7 +745,7 @@ class HanchuessEnergyCard extends HTMLElement {
     const options = (state.attributes.work_mode_options || []).map(opt => opt.label);
     if (select.options.length !== options.length + 1) {
       select.innerHTML = `<option value="">${_t(this._hass, 'please_select')}</option>` +
-        options.map(opt => `<option value="${opt}">${opt}</option>`).join("");
+        options.map(opt => `<option value="${_escapeHtml(opt)}">${_escapeHtml(opt)}</option>`).join("");
     }
 
     const fields = state.attributes.energy_fields || [];
@@ -754,51 +767,56 @@ class HanchuessEnergyCard extends HTMLElement {
 
     let html = "";
     for (const field of fields) {
+      const fieldCode = String(field.code ?? "");
+      const fieldSignal = String(field.signal ?? "");
+      const fieldName = _escapeHtml(field.name);
       const la = field.listener_code
-        ? `data-listener-code="${field.listener_code}" data-listener-show="${field.listener_show}"`
+        ? `data-listener-code="${_escapeHtml(field.listener_code)}" data-listener-show="${_escapeHtml(field.listener_show)}"`
         : "";
       const cls = field.hidden || field.listener_code ? "dynamic-field" : "dynamic-field visible";
 
       if (field.type === "1") {
         const min = field.min || "0", max = field.max || "99999";
         const step = field.step || 1;
-        html += `<div class="${cls}" ${la} data-signal="${field.signal}"><div class="field"><label>${field.name}</label><input type="number" data-signal="${field.signal}" data-step="${step}" min="${min}" max="${max}" step="${step}" placeholder="[${min}, ${max}]"></div></div>`;
+        html += `<div class="${cls}" ${la} data-signal="${_escapeHtml(fieldSignal)}"><div class="field"><label>${fieldName}</label><input type="number" data-signal="${_escapeHtml(fieldSignal)}" data-step="${_escapeHtml(step)}" min="${_escapeHtml(min)}" max="${_escapeHtml(max)}" step="${_escapeHtml(step)}" placeholder="[${_escapeHtml(min)}, ${_escapeHtml(max)}]"></div></div>`;
       }
 
       if (field.type === "6") {
-        const sigs = (field.signal || "").split(",");
-        const code = field.code || "";
+        const sigs = fieldSignal.split(",");
+        const code = fieldCode;
         const gk = code.startsWith("chg_tim") ? "chg" : code.startsWith("dschg_tim") ? "dschg" : code;
         const idx = (code.match(/(\d)$/) || [,"1"])[1];
         const fmt = field.format || "";
-        html += `<div class="${cls}" ${la} data-signal="${field.signal}" data-time-group="${gk}" data-time-index="${idx}" data-time-fmt="${fmt}"><div class="time-row"><span class="time-label">${field.name}</span><input type="text" class="time-input" data-signal="${sigs[0]||""}" data-time-type="start" readonly><span>-</span><input type="text" class="time-input" data-signal="${sigs[1]||""}" data-time-type="end" readonly><button class="icon-btn del" data-action="del-time" data-group="${gk}" data-index="${idx}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${gk}" data-index="${idx}" style="display:none">+</button></div></div>`;
+        html += `<div class="${cls}" ${la} data-signal="${_escapeHtml(fieldSignal)}" data-time-group="${_escapeHtml(gk)}" data-time-index="${_escapeHtml(idx)}" data-time-fmt="${_escapeHtml(fmt)}"><div class="time-row"><span class="time-label">${fieldName}</span><input type="text" class="time-input" data-signal="${_escapeHtml(sigs[0]||"")}" data-time-type="start" readonly><span>-</span><input type="text" class="time-input" data-signal="${_escapeHtml(sigs[1]||"")}" data-time-type="end" readonly><button class="icon-btn del" data-action="del-time" data-group="${_escapeHtml(gk)}" data-index="${_escapeHtml(idx)}">🗑</button><button class="icon-btn add" data-action="add-time" data-group="${_escapeHtml(gk)}" data-index="${_escapeHtml(idx)}" style="display:none">+</button></div></div>`;
       }
 
       if (field.type === "collapse") {
         const children = field.children || [];
-        const sig = field.signal;
+        const sig = fieldSignal;
         // Determine time group for overlap detection from field code (e.g. TCT_CHG0 -> chg, TCT_DISCHG1 -> dschg)
-        const collapseGroup = field.code && field.code.includes("DISCHG") ? "dschg" : field.code && field.code.includes("CHG") ? "chg" : "";
+        const collapseGroup = fieldCode.includes("DISCHG") ? "dschg" : fieldCode.includes("CHG") ? "chg" : "";
         let switchHtml = "";
         let bodyHtml = "";
         for (const c of children) {
+          const childCode = String(c.code ?? "");
+          const childName = _escapeHtml(c.name);
           const ci = c.index != null ? c.index : 0;
           if (c.type === "3") {
-            const opts = (c.options||[]).map(o => `<option value="${o.value}">${o.name}</option>`).join("");
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><select data-arr-signal="${sig}" data-arr-index="${ci}">${opts}</select></div>`;
+            const opts = (c.options||[]).map(o => `<option value="${_escapeHtml(o.value)}">${_escapeHtml(o.name)}</option>`).join("");
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${childName}</label><select data-arr-signal="${_escapeHtml(sig)}" data-arr-index="${_escapeHtml(ci)}">${opts}</select></div>`;
           } else if (c.type === "5") {
-            const timeTypeAttr = c.code === "start_time" ? 'data-time-type="start"' : c.code === "end_time" ? 'data-time-type="end"' : "";
-            const groupAttr = collapseGroup ? `data-time-group="${collapseGroup}"` : "";
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="text" class="time-input" data-arr-signal="${sig}" data-arr-index="${ci}" data-arr-fmt="time" ${timeTypeAttr} ${groupAttr} readonly></div>`;
+            const timeTypeAttr = childCode === "start_time" ? 'data-time-type="start"' : childCode === "end_time" ? 'data-time-type="end"' : "";
+            const groupAttr = collapseGroup ? `data-time-group="${_escapeHtml(collapseGroup)}"` : "";
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${childName}</label><input type="text" class="time-input" data-arr-signal="${_escapeHtml(sig)}" data-arr-index="${_escapeHtml(ci)}" data-arr-fmt="time" ${timeTypeAttr} ${groupAttr} readonly></div>`;
           } else if (c.type === "1") {
             const mn = c.min||"0", mx = c.max||"99999", cStep = c.step||1;
-            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${c.name}</label><input type="number" data-arr-signal="${sig}" data-arr-index="${ci}" data-step="${cStep}" min="${mn}" max="${mx}" step="${cStep}" placeholder="[${mn}, ${mx}]"></div>`;
+            bodyHtml += `<div class="collapse-row"><label><span class="req">*</span>${childName}</label><input type="number" data-arr-signal="${_escapeHtml(sig)}" data-arr-index="${_escapeHtml(ci)}" data-step="${_escapeHtml(cStep)}" min="${_escapeHtml(mn)}" max="${_escapeHtml(mx)}" step="${_escapeHtml(cStep)}" placeholder="[${_escapeHtml(mn)}, ${_escapeHtml(mx)}]"></div>`;
           }
         }
         // "是否应用" from FLAG_ENABLE_CYCLE, not from array
-        switchHtml = `<span class="collapse-sw-label">${_t(this._hass, 'apply')}</span><label class="toggle"><input type="checkbox" data-enable-signal="${field.code}" data-collapse-switch="${field.code}"><span class="slider"></span></label>`;
-        const collapseGroupAttr = collapseGroup ? `data-time-group="${collapseGroup}"` : "";
-        html += `<div class="${cls}" ${la} data-signal="${sig}" data-collapse="${field.code}" ${collapseGroupAttr}><div class="collapse-card"><div class="collapse-header"><span class="collapse-arrow" data-arrow="${field.code}" data-toggle="${field.code}">▶</span><span class="collapse-title" data-toggle="${field.code}">${field.name}</span>${switchHtml}</div><div class="collapse-body" data-body="${field.code}">${bodyHtml}</div></div></div>`;
+        switchHtml = `<span class="collapse-sw-label">${_t(this._hass, 'apply')}</span><label class="toggle"><input type="checkbox" data-enable-signal="${_escapeHtml(fieldCode)}" data-collapse-switch="${_escapeHtml(fieldCode)}"><span class="slider"></span></label>`;
+        const collapseGroupAttr = collapseGroup ? `data-time-group="${_escapeHtml(collapseGroup)}"` : "";
+        html += `<div class="${cls}" ${la} data-signal="${_escapeHtml(sig)}" data-collapse="${_escapeHtml(fieldCode)}" ${collapseGroupAttr}><div class="collapse-card"><div class="collapse-header"><span class="collapse-arrow" data-arrow="${_escapeHtml(fieldCode)}" data-toggle="${_escapeHtml(fieldCode)}">▶</span><span class="collapse-title" data-toggle="${_escapeHtml(fieldCode)}">${fieldName}</span>${switchHtml}</div><div class="collapse-body" data-body="${_escapeHtml(fieldCode)}">${bodyHtml}</div></div></div>`;
       }
     }
 
@@ -815,8 +833,8 @@ class HanchuessEnergyCard extends HTMLElement {
       const hdr = e.target.closest("[data-toggle]");
       if (hdr) {
         const code = hdr.dataset.toggle;
-        const body = container.querySelector(`[data-body="${code}"]`);
-        const arrow = container.querySelector(`[data-arrow="${code}"]`);
+        const body = container.querySelector(`[data-body="${_escapeCssString(code)}"]`);
+        const arrow = container.querySelector(`[data-arrow="${_escapeCssString(code)}"]`);
         if (body) body.classList.toggle("open");
         if (arrow) arrow.classList.toggle("open");
       }
@@ -826,8 +844,8 @@ class HanchuessEnergyCard extends HTMLElement {
       const sw = e.target.closest("[data-collapse-switch]");
       if (sw) {
         const code = sw.dataset.collapseSwitch;
-        const body = container.querySelector(`[data-body="${code}"]`);
-        const arrow = container.querySelector(`[data-arrow="${code}"]`);
+        const body = container.querySelector(`[data-body="${_escapeCssString(code)}"]`);
+        const arrow = container.querySelector(`[data-arrow="${_escapeCssString(code)}"]`);
         if (sw.checked) {
           if (body) body.classList.add("open");
           if (arrow) arrow.classList.add("open");
